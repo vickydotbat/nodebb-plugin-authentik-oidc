@@ -85,7 +85,11 @@ function createMocks() {
 		},
 		email: {
 			async confirmByUid(uid) {
-				state.users.get(parseInt(uid, 10))['email:confirmed'] = 1;
+				const data = state.users.get(parseInt(uid, 10));
+				data['email:confirmed'] = 1;
+				if (data.email) {
+					state.emailToUid.set(data.email.toLowerCase(), parseInt(uid, 10));
+				}
 			},
 		},
 	};
@@ -101,6 +105,22 @@ function createMocks() {
 			if (key === 'authentik:sub:uid') {
 				state.subToUid.set(field, parseInt(value, 10));
 			}
+		},
+		async getSortedSetRange(key, start, stop) {
+			if (key === 'users:joindate') {
+				return [...state.users.keys()].slice(start, stop + 1);
+			}
+			return [];
+		},
+		async getObjectsFields(keys, fields) {
+			return keys.map((key) => {
+				const uid = parseInt(String(key).replace(/^user:/, ''), 10);
+				const data = state.users.get(uid) || {};
+				return fields.reduce((memo, field) => {
+					memo[field] = data[field];
+					return memo;
+				}, {});
+			});
 		},
 	};
 

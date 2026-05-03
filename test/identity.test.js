@@ -66,6 +66,43 @@ test('existing user with same verified email links without duplicate', async () 
 	}
 });
 
+test('existing user with same unindexed email links without duplicate', async () => {
+	const mocks = createMocks();
+	mocks.state.users.set(42, {
+		uid: 42,
+		username: 'archvillainette',
+		email: 'person@example.com',
+		'email:confirmed': 0,
+	});
+	const { identity, restore } = loadIdentity(mocks);
+	try {
+		const result = await identity.resolve(verified(), { issuer: 'https://id.example.com' });
+		assert.equal(result.uid, 42);
+		assert.equal(mocks.state.users.size, 1);
+		assert.equal(mocks.state.subToUid.get('sub-1'), 42);
+		assert.equal(mocks.state.emailToUid.get('person@example.com'), 42);
+		assert.equal(mocks.state.users.get(42)['email:confirmed'], 1);
+	} finally {
+		restore();
+	}
+});
+
+test('multiple existing users with same unindexed email fail safely', async () => {
+	const mocks = createMocks();
+	mocks.state.users.set(42, { uid: 42, username: 'a', email: 'person@example.com' });
+	mocks.state.users.set(43, { uid: 43, username: 'b', email: 'PERSON@example.com' });
+	const { identity, restore } = loadIdentity(mocks);
+	try {
+		await assert.rejects(
+			identity.resolve(verified(), { issuer: 'https://id.example.com' }),
+			/multiple existing accounts/
+		);
+		assert.equal(mocks.state.subToUid.size, 0);
+	} finally {
+		restore();
+	}
+});
+
 test('unverified email rejects without creating or linking', async () => {
 	const mocks = createMocks();
 	const { identity, restore } = loadIdentity(mocks);
