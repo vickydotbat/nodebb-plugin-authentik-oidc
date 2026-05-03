@@ -15,6 +15,8 @@ Covered baseline cases:
 - `sub` mapped to uid A but email belongs to uid B rejects.
 - Missing email rejects.
 - String `"true"` for `email_verified` rejects.
+- Mapping audit reports healthy, stale, missing reverse, conflicting reverse, and duplicate user-side subject links.
+- Stale mapping repair requires explicit confirmation and removes only mappings whose uid no longer exists.
 
 ## Manual Authentik Integration
 
@@ -41,6 +43,8 @@ Covered baseline cases:
 - Confirm an existing local NodeBB account with a verified matching email links without duplicate account creation.
 - Confirm unverified or missing email claims fail closed and leave no new user or mapping behind.
 - Confirm a deliberate `sub`/email collision fails closed and logs a warning.
+- In ACP, run Identity Mapping Diagnostics and confirm the audit summary matches the database.
+- If stale mappings exist, use Repair stale and confirm only mappings pointing to missing NodeBB users are removed.
 
 ## Manual Observations
 

@@ -10,11 +10,11 @@ Authentik-compatible OAuth2/OIDC SSO for NodeBB with strict verified-email ident
 - Rejects missing/unverified email for unlinked identities.
 - Rejects `sub`/email collisions instead of silently creating duplicate users.
 - Keeps username display-only and never uses it for identity matching.
-- Provides an ACP settings page with issuer discovery and secret-preserving saves.
+- Provides an ACP settings page with issuer discovery, secret-preserving saves, mapping audit, and stale mapping repair.
 
 Planned profile synchronization work is tracked in [Next steps](docs/NEXT_STEPS.md). Authentik profile data such as username, email, display name, and avatar should be synced only through explicit admin settings after identity resolution succeeds.
 
-Planned ACP improvements include grouped settings, sync toggles, authorization-parameter controls, diagnostics, mapping audit/repair tools, and dry-run profile synchronization.
+Planned ACP improvements include grouped settings, sync toggles, authorization-parameter controls, broader diagnostics, and dry-run profile synchronization.
 
 Planned user-profile controls include linked-account status, managed-field indicators, safe profile refresh, optional disconnect policy, and redirects to configured Authentik self-service pages.
 
@@ -57,6 +57,8 @@ Use the issuer URL from Authentik in the plugin settings and click Discover to p
 NodeBB can only enforce identity rules after Authentik returns OIDC claims. Configure Authentik enrollment flows to reject missing email, duplicate emails, and duplicate usernames before provider-side account creation completes.
 
 If testing unverified email behavior, inspect the actual OIDC ID token or userinfo response. Authentik custom attributes do not necessarily change the emitted `email_verified` claim.
+
+Use Identity Mapping Diagnostics in the ACP to audit `authentik:sub:uid` mappings. The repair action only removes stale subject mappings that point to missing NodeBB users and requires confirmation.
 
 ## Tests
 

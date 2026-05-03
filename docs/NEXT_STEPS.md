@@ -49,7 +49,7 @@
 - Add an admin setting for username-collision policy:
   - `unique`: create a safe unique NodeBB username for new SSO users.
   - `reject`: fail new SSO account creation if `preferred_username` conflicts with an existing NodeBB username/userslug.
-- Add a small admin/CLI repair tool to list and remove stale `authentik:sub:uid` mappings whose uid no longer exists.
+- Extend the new ACP mapping audit/repair tooling with CLI access if live operations need non-browser repair.
 - Add tests around NodeBB's userslug collision behavior, not only exact username matching.
 
 ## Avatar Investigation

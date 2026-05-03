@@ -39,6 +39,20 @@ plugin.registerApiRoutes = async function ({ router, middleware }) {
 		adminMiddlewares,
 		admin.discover
 	);
+	routeHelpers.setupApiRoute(
+		router,
+		'get',
+		'/authentik-oidc/mappings/audit',
+		adminMiddlewares,
+		admin.auditMappings
+	);
+	routeHelpers.setupApiRoute(
+		router,
+		'post',
+		'/authentik-oidc/mappings/repair-stale',
+		adminMiddlewares,
+		admin.repairStaleMappings
+	);
 };
 
 async function ensureSettingsAdmin(req, res, next) {

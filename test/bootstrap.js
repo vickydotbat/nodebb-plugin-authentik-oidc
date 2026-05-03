@@ -106,6 +106,12 @@ function createMocks() {
 			}
 			return null;
 		},
+		async getObject(key) {
+			if (key === 'authentik:sub:uid') {
+				return Object.fromEntries(state.subToUid.entries());
+			}
+			return {};
+		},
 		async setObjectField(key, field, value) {
 			if (key === 'authentik:sub:uid') {
 				state.subToUid.set(field, parseInt(value, 10));

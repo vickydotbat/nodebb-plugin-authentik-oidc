@@ -71,6 +71,46 @@ define('admin/plugins/authentik-oidc', ['alerts'], function (alerts) {
 		});
 	}
 
+	function escapeHtml(value) {
+		return String(value || '').replace(/[&<>"']/g, function (char) {
+			return {
+				'&': '&amp;',
+				'<': '&lt;',
+				'>': '&gt;',
+				'"': '&quot;',
+				"'": '&#39;',
+			}[char];
+		});
+	}
+
+	function renderMappingAudit(result) {
+		const summary = result.summary || {};
+		$('[data-authentik-audit-summary]').text([
+			`${summary.mappings || 0} mappings`,
+			`${summary.linkedUsers || 0} linked users`,
+			`${summary.staleMappings || 0} stale`,
+			`${summary.reverseMissing || 0} missing reverse`,
+			`${summary.reverseConflicts || 0} conflicts`,
+			`${summary.duplicateUserLinks || 0} duplicate user links`,
+		].join(' | '));
+
+		const rows = [];
+		(result.staleMappings || []).forEach((entry) => {
+			rows.push(`<tr><td>Stale mapping</td><td>${escapeHtml(entry.uid)}</td><td><code>${escapeHtml(entry.sub)}</code></td></tr>`);
+		});
+		(result.reverseMissing || []).forEach((entry) => {
+			rows.push(`<tr><td>Missing reverse mapping</td><td>${escapeHtml(entry.uid)}</td><td><code>${escapeHtml(entry.sub)}</code></td></tr>`);
+		});
+		(result.reverseConflicts || []).forEach((entry) => {
+			rows.push(`<tr><td>Reverse conflict</td><td>${escapeHtml(entry.uid)}</td><td><code>${escapeHtml(entry.sub)}</code></td></tr>`);
+		});
+		(result.duplicateUserLinks || []).forEach((entry) => {
+			rows.push(`<tr><td>Duplicate user links</td><td>${escapeHtml(entry.users.map(user => user.uid).join(', '))}</td><td><code>${escapeHtml(entry.sub)}</code></td></tr>`);
+		});
+		$('[data-authentik-audit-results]').html(rows.join('') || '<tr><td colspan="3" class="text-muted">No mapping issues found.</td></tr>');
+		$('[data-action="repair-stale-mappings"]').prop('disabled', !(summary.staleMappings > 0));
+	}
+
 	Admin.init = async function () {
 		fill(await get('/settings'));
 
@@ -102,6 +142,28 @@ define('admin/plugins/authentik-oidc', ['alerts'], function (alerts) {
 					showErrors(err.errors);
 				}
 				alerts.error(err.message || 'Settings save failed');
+			}
+		});
+
+		$('[data-action="audit-mappings"]').on('click', async function () {
+			try {
+				renderMappingAudit(await get('/mappings/audit'));
+				alerts.success('Mapping audit completed');
+			} catch (err) {
+				alerts.error(err.message || 'Mapping audit failed');
+			}
+		});
+
+		$('[data-action="repair-stale-mappings"]').on('click', async function () {
+			if (!window.confirm('Remove stale Authentik subject mappings that point to missing NodeBB users?')) {
+				return;
+			}
+			try {
+				const result = await post('/mappings/repair-stale', { confirm: true });
+				alerts.success(`Removed ${result.removed || 0} stale mappings`);
+				renderMappingAudit(await get('/mappings/audit'));
+			} catch (err) {
+				alerts.error(err.message || 'Stale mapping repair failed');
 			}
 		});
 	};

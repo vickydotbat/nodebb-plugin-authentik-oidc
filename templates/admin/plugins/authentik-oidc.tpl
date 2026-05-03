@@ -94,6 +94,39 @@
 					<label class="form-check-label" for="allowInsecureCallbackUrlForDevelopment">Allow HTTP callback URL for localhost development</label>
 				</div>
 			</form>
+
+			<hr>
+
+			<section class="authentik-oidc-diagnostics">
+				<div class="d-flex justify-content-between align-items-center mb-3">
+					<h2 class="h4 mb-0">Identity Mapping Diagnostics</h2>
+					<div class="btn-group">
+						<button type="button" class="btn btn-outline-secondary" data-action="audit-mappings">
+							<i class="fa fa-list-check"></i> Audit mappings
+						</button>
+						<button type="button" class="btn btn-outline-danger" data-action="repair-stale-mappings" disabled>
+							<i class="fa fa-trash"></i> Repair stale
+						</button>
+					</div>
+				</div>
+				<p class="text-muted" data-authentik-audit-summary>Run an audit to inspect Authentik subject mappings.</p>
+				<div class="table-responsive">
+					<table class="table table-sm">
+						<thead>
+							<tr>
+								<th>Issue</th>
+								<th>UID</th>
+								<th>Subject</th>
+							</tr>
+						</thead>
+						<tbody data-authentik-audit-results>
+							<tr>
+								<td colspan="3" class="text-muted">No audit has run yet.</td>
+							</tr>
+						</tbody>
+					</table>
+				</div>
+			</section>
 		</div>
 	</div>
 </div>
