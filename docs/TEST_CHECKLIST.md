@@ -54,3 +54,17 @@ Covered baseline cases:
 - 2026-05-03: Existing account `archvillainette` was successfully linked after stale mapping cleanup and unindexed-email fallback; no duplicate account was generated.
 - 2026-05-03: Authentik-only user `TestVicky4` hit `Username already taken` during NodeBB account creation. Added create-time username retry handling because NodeBB rejects by slug/creation validation, not only exact username lookup.
 - 2026-05-03: Registering through Authentik with a new username `TestVicky5` but an email already linked to a different Authentik subject allowed Authentik email verification to complete, then NodeBB rejected with `Existing account is linked to a different OIDC subject`. This is correct fail-closed plugin behavior after the provider returns claims; preventing the Authentik-side verification step requires Authentik flow/policy configuration.
+- 2026-05-03: Existing NodeBB-only user `TestVicky6` plus Authentik registration using the same username but different email created a new NodeBB user named `TestVicky6 0`. This is safe from an identity-takeover perspective because username is not used for identity, but product behavior may need a stricter policy option to block new SSO account creation when `preferred_username` collides with an existing NodeBB username.
+- 2026-05-03: During the `TestVicky6` flow, the Authentik UI showed the original `archvillainette` avatar before email verification. Treat as an Authentik/session-selection issue to investigate. Possible mitigation is adding an authorization request option such as `prompt=login` or configuring Authentik account selection flows.
+- 2026-05-03: Setting Authentik custom attributes to `email_verified: false` did not cause NodeBB rejection; login passed and NodeBB marked the email verified. This likely means Authentik still emitted OIDC `email_verified: true` or did not map the custom attribute into the actual claim. Add claim-inspection tooling or Authentik claim policy validation before considering the unverified-email live test passed.
+- 2026-05-03: Authentik user with no email was rejected by NodeBB with `OIDC email is required`; no NodeBB user was created.
+- 2026-05-03: Repeat login for linked `archvillainette` did not create a new NodeBB account. The browser appeared to hang after provider flows, but the NodeBB session was established successfully.
+- 2026-05-03: Normal NodeBB password login still works.
+
+## Open Live Items
+
+- Retest username collision after deciding whether the intended behavior is "create a safe unique username" or "block SSO account creation when preferred username already exists".
+- Capture actual OIDC ID token/userinfo claims for the `email_verified: false` scenario. Do not rely on Authentik custom attributes alone.
+- Investigate Authentik account-selection/avatar behavior. Decide whether to add optional `prompt=login`, `prompt=select_account`, or an admin-configurable authorization parameter field.
+- Investigate post-callback hang after successful login and confirm whether the callback response/redirect chain completes cleanly.
+- Add Authentik-side flow/policy rules to reject registration when username or email already exists in Authentik, and document that NodeBB can only enforce checks after OIDC claims return.

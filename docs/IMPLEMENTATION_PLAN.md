@@ -508,9 +508,97 @@ Manual integration tests should cover:
 - Expand README with install, activation, Authentik setup, and troubleshooting.
 - Add `docs/SECURITY.md`.
 - Add `docs/TEST_CHECKLIST.md`.
+- Add `docs/NEXT_STEPS.md`.
 - Add npm metadata and NodeBB compatibility declaration.
 - Add changelog.
 - Add dependency audit/update notes.
+
+### Phase 7: Live-Test Hardening
+
+- Add sanitized diagnostics for failed OIDC callbacks without logging raw tokens.
+- Add optional provider authorization parameters such as `prompt=login` or `prompt=select_account`.
+- Decide username-collision policy: safe unique username creation versus strict rejection.
+- Add stale mapping repair/list tooling for `authentik:sub:uid`.
+- Document Authentik enrollment policies for missing email, duplicate email, and duplicate username prevention.
+- Verify actual emitted `email_verified` claims during live tests instead of assuming Authentik custom attributes affect OIDC output.
+
+### Phase 8: Avatar Isolation And Profile Sync
+
+- Investigate reports that new SSO-created users sometimes show an existing NodeBB user's avatar.
+- Add diagnostics around account creation: resolved uid, created uid, provider `sub`, provider `picture`, and NodeBB avatar fields before and after writes.
+- Confirm the plugin never copies profile fields from `req.uid`, the current browser session, or a previously linked account into a new SSO-created uid.
+- Implement profile synchronization only after identity resolution succeeds.
+- Add admin settings for per-field sync:
+  - `syncEmail`
+  - `syncUsername`
+  - `syncFullname`
+  - `syncAvatar`
+  - explicit custom claim-to-user-field mappings
+- Add conflict policies:
+  - Email collision always fails closed.
+  - Username collision can either reject, keep local username, or generate a unique username, depending on admin setting.
+  - Avatar sync can skip invalid or missing `picture` claims without blocking login.
+- Store sync metadata such as `authentikLastSyncedAt`, `authentikLastEmail`, `authentikLastUsername`, and `authentikLastPicture`.
+- Add unit tests and live tests for email change, username change, username collision, missing `picture`, invalid avatar URL, valid avatar URL, local profile edits, and custom field mappings.
+
+### Phase 9: ACP Expansion And Operator UX
+
+- Redesign the ACP page into grouped panels for provider connection, login behavior, identity rules, synchronization, and diagnostics/repair.
+- Add settings for:
+  - plugin enablement
+  - display name
+  - client id and secret
+  - issuer and endpoints
+  - scopes
+  - PKCE
+  - development HTTP callback allowance
+  - custom authorization parameters
+  - new-account creation policy
+  - username collision policy
+  - stale mapping cleanup policy
+  - per-field synchronization toggles
+  - diagnostics mode
+- Add operator actions:
+  - discover provider metadata
+  - test JWKS
+  - copy callback URL
+  - show sanitized last failure
+  - audit identity mappings
+  - repair stale mappings
+  - dry-run profile sync for a uid or `sub`
+- Add frontend UX details:
+  - inline field errors
+  - loading states
+  - disabled save while saving
+  - confirmation dialogs for destructive or overwrite-heavy settings
+  - clear secret-present indicator without exposing saved secret
+  - warnings for development-only settings
+- Add API endpoints and tests for settings validation, diagnostics, audit, repair, and dry-run sync.
+- Keep the first ACP iteration conservative: no raw token/claim display and no destructive action without explicit confirmation.
+
+### Phase 10: User Profile OIDC Controls
+
+- Add a NodeBB profile/settings section for linked OIDC account state.
+- Initially show only NodeBB-controlled and safely derived fields:
+  - linked/unlinked status
+  - provider display name
+  - issuer
+  - last login time
+  - last sync time
+  - last provider email seen
+  - local fields managed by Authentik sync
+- Add user actions:
+  - refresh profile from Authentik by re-running OIDC login
+  - disconnect Authentik only when admin policy allows it and a fallback login method exists
+  - open configured Authentik self-service profile/password/MFA/session URLs
+- Add ACP settings for external Authentik self-service URLs.
+- Add read-only indicators to local profile fields managed by Authentik sync.
+- Add permission and safety checks:
+  - users cannot edit `authentikSub`, issuer, or mapping data
+  - users cannot force-link a different Authentik subject over the current mapping
+  - disconnect requires CSRF protection, confirmation, and fallback-login verification
+  - refresh/sync resolves by linked `sub`, never username or user-provided email
+- Add tests for panel rendering, permissions, external links, disconnect policy, and managed-field indicators.
 
 ## Release Acceptance Criteria
 
@@ -523,6 +611,13 @@ Manual integration tests should cover:
 - Collision cases reject with warnings.
 - Client secret is not exposed by settings read APIs.
 - README documents setup and security model.
+- Live tests confirm missing email rejection, stale mapping recovery, repeat login by `sub`, and existing-email linking.
+- Unverified-email live tests inspect actual OIDC claims and confirm `email_verified === false` is rejected.
+- New SSO-created users do not inherit avatar or profile fields from any existing NodeBB session/user.
+- Profile synchronization is disabled by default or clearly documented, and each synced field has tests for conflicts and missing claims.
+- ACP exposes useful toggles and diagnostics without exposing secrets or raw tokens.
+- ACP repair and sync dry-run tools are covered by tests before destructive actions are enabled.
+- User profile OIDC controls expose only safe link/sync state, with Authentik-managed actions handled through configured redirects or read-only indicators.
 
 ## Source References
 
