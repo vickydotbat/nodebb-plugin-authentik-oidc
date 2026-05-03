@@ -10,7 +10,7 @@ Authentik-compatible OAuth2/OIDC SSO for NodeBB with strict verified-email ident
 - Rejects missing/unverified email for unlinked identities.
 - Rejects `sub`/email collisions instead of silently creating duplicate users.
 - Keeps username display-only and never uses it for identity matching.
-- Provides an ACP settings page with issuer discovery, secret-preserving saves, mapping audit, and stale mapping repair.
+- Provides an ACP settings page with issuer discovery, secret-preserving saves, authorization parameters, username collision policy, sanitized last-failure diagnostics, mapping audit, and stale mapping repair.
 
 Planned profile synchronization work is tracked in [Next steps](docs/NEXT_STEPS.md). Authentik profile data such as username, email, display name, and avatar should be synced only through explicit admin settings after identity resolution succeeds.
 
@@ -52,6 +52,14 @@ Create an Authentik OAuth2/OpenID provider:
 
 Use the issuer URL from Authentik in the plugin settings and click Discover to populate endpoints.
 
+Optional provider authorization parameters can be configured as a query string, for example:
+
+```text
+prompt=login
+```
+
+Use this when testing account selection or when an existing Authentik browser session is causing the wrong account to be reused. The plugin rejects attempts to override protocol-critical parameters such as `state`, `nonce`, `client_id`, `redirect_uri`, and `scope`.
+
 ## Operational Notes
 
 NodeBB can only enforce identity rules after Authentik returns OIDC claims. Configure Authentik enrollment flows to reject missing email, duplicate emails, and duplicate usernames before provider-side account creation completes.
@@ -59,6 +67,10 @@ NodeBB can only enforce identity rules after Authentik returns OIDC claims. Conf
 If testing unverified email behavior, inspect the actual OIDC ID token or userinfo response. Authentik custom attributes do not necessarily change the emitted `email_verified` claim.
 
 Use Identity Mapping Diagnostics in the ACP to audit `authentik:sub:uid` mappings. The repair action only removes stale subject mappings that point to missing NodeBB users and requires confirmation.
+
+Use Last failure in the ACP diagnostics section when an OIDC callback is rejected. It stores only sanitized metadata such as rejection code, claim presence, `email_verified` type/value, issuer metadata, and whether userinfo was used. It does not store raw tokens, authorization codes, full claim payloads, or email addresses.
+
+The username collision policy defaults to creating a safe unique NodeBB username for new SSO users. Set it to reject if new SSO account creation should fail when the provider's display username conflicts with an existing NodeBB username/userslug.
 
 ## Tests
 

@@ -15,6 +15,8 @@ The plugin never links or finds accounts by username. `preferred_username` and `
 
 Secrets, authorization codes, access tokens, refresh tokens, and raw ID tokens must not be logged. Admin settings responses show only a placeholder when a client secret is saved.
 
+The ACP Last failure diagnostic stores only sanitized failure metadata: rejection code, stage, issuer metadata, claim presence flags, `email_verified` type/value, and whether userinfo contributed claims. It deliberately does not store raw tokens, authorization codes, full ID token/userinfo payloads, email addresses, or usernames.
+
 ## Provider Boundary
 
 The plugin can only enforce identity rules after Authentik redirects back with OIDC claims. It cannot stop Authentik from creating or verifying an Authentik-side account during an upstream enrollment flow. Authentik flows and policies should block provider-side registration when a username or email is already in use, when email is missing, or when the user has not completed the intended verification step.
@@ -23,9 +25,9 @@ For live testing, do not assume Authentik custom attributes change OIDC claims. 
 
 ## Hardening Backlog
 
-- Add an admin-only diagnostic mode that records sanitized claim metadata for the last failed login: claim presence, boolean type of `email_verified`, issuer, audience match result, and rejection reason. Do not log raw tokens.
-- Add an optional authorization-parameter setting for provider-specific prompts such as `prompt=login` or `prompt=select_account`.
-- Consider a strict username-collision policy that rejects new SSO account creation when `preferred_username` normalizes to an existing NodeBB username or userslug. This is a product/admin policy, not an identity-safety requirement.
+- Expand diagnostics beyond the last failure record when needed, while keeping token and raw claim payload storage prohibited.
+- Add tests or live verification for provider-specific prompts such as `prompt=login` or `prompt=select_account`.
+- Evaluate whether the strict username-collision policy should become the recommended release default for this installation. This is a product/admin policy, not an identity-safety requirement.
 - Add cleanup tooling for stale `authentik:sub:uid` mappings and duplicate test accounts created during early live testing.
 - Document Authentik flow policies for rejecting missing email and pre-existing username/email before provider-side account creation completes.
 

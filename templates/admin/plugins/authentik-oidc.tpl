@@ -74,6 +74,21 @@
 				</div>
 
 				<div class="mb-3">
+					<label class="form-label" for="authorizationParameters">Authorization parameters</label>
+					<input class="form-control" id="authorizationParameters" type="text" placeholder="prompt=login" data-authentik-field="authorizationParameters">
+					<div class="form-text">Optional query string parameters sent to the provider. Plugin-controlled parameters cannot be overridden.</div>
+					<div class="form-text text-danger" data-authentik-error="authorizationParameters"></div>
+				</div>
+
+				<div class="mb-3">
+					<label class="form-label" for="usernameCollisionPolicy">Username collision policy</label>
+					<select class="form-select" id="usernameCollisionPolicy" data-authentik-field="usernameCollisionPolicy">
+						<option value="unique">Create a unique NodeBB username</option>
+						<option value="reject">Reject new SSO account creation</option>
+					</select>
+				</div>
+
+				<div class="mb-3">
 					<label class="form-label" for="callbackUrl">Callback URL</label>
 					<div class="input-group">
 						<input class="form-control" id="callbackUrl" type="text" readonly data-authentik-field="callbackUrl">
@@ -104,6 +119,9 @@
 						<button type="button" class="btn btn-outline-secondary" data-action="audit-mappings">
 							<i class="fa fa-list-check"></i> Audit mappings
 						</button>
+						<button type="button" class="btn btn-outline-secondary" data-action="show-last-failure">
+							<i class="fa fa-circle-exclamation"></i> Last failure
+						</button>
 						<button type="button" class="btn btn-outline-danger" data-action="repair-stale-mappings" disabled>
 							<i class="fa fa-trash"></i> Repair stale
 						</button>
@@ -126,6 +144,7 @@
 						</tbody>
 					</table>
 				</div>
+				<pre class="border rounded p-3 bg-light text-body-secondary" data-authentik-last-failure>No failure diagnostics loaded.</pre>
 			</section>
 		</div>
 	</div>

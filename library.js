@@ -48,6 +48,13 @@ plugin.registerApiRoutes = async function ({ router, middleware }) {
 	);
 	routeHelpers.setupApiRoute(
 		router,
+		'get',
+		'/authentik-oidc/diagnostics/last-failure',
+		adminMiddlewares,
+		admin.getLastFailure
+	);
+	routeHelpers.setupApiRoute(
+		router,
 		'post',
 		'/authentik-oidc/mappings/repair-stale',
 		adminMiddlewares,

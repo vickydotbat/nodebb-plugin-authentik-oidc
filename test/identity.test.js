@@ -142,6 +142,25 @@ test('username conflict detected by create retries with safe unique username', a
 	}
 });
 
+test('username collision reject policy fails new SSO account creation', async () => {
+	const mocks = createMocks();
+	mocks.state.users.set(7, { uid: 7, username: 'Person' });
+	const { identity, restore } = loadIdentity(mocks);
+	try {
+		await assert.rejects(
+			identity.resolve(
+				verified({ email: 'other@example.com' }),
+				{ issuer: 'https://id.example.com', usernameCollisionPolicy: 'reject' }
+			),
+			/preferred username is already unavailable/
+		);
+		assert.equal(mocks.state.users.size, 1);
+		assert.equal(mocks.state.subToUid.size, 0);
+	} finally {
+		restore();
+	}
+});
+
 test('email race during user creation links existing verified email without duplicate', async () => {
 	const mocks = createMocks();
 	let createdDuringRace = false;

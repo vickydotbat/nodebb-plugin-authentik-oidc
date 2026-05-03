@@ -4,10 +4,10 @@
 
 ### P0: Release-Critical Identity Safety
 
-- Finish live verification for username collision after create-time retry handling.
-- Capture actual OIDC claims for an intended unverified-email account and confirm `email_verified === false` is rejected.
-- Investigate post-callback hangs after successful login.
-- Confirm stale `authentik:sub:uid` cleanup in live data.
+- Run one final live Authentik pass after rebuilding NodeBB with the current plugin code.
+- Capture actual OIDC claims for an intended unverified-email account and confirm `email_verified === false` is rejected. Use ACP Last failure diagnostics after the rejected callback; inspect provider-side token/userinfo only as needed.
+- Retest post-callback completion after successful repeat login and confirm the browser receives the NodeBB success redirect cleanly.
+- Confirm stale `authentik:sub:uid` cleanup in live data through the ACP mapping audit and repair flow.
 - Keep the first release focused on reliable login, no duplicate accounts by verified email, safe collision handling, and clear operational documentation.
 
 ### P1: Operator Safety And Diagnostics
@@ -37,18 +37,18 @@
 
 ## Release Blockers
 
-- Verify the username-collision behavior after the latest retry handling. Decide whether the release policy is to create a unique NodeBB username or to reject collisions entirely.
+- Verify both username-collision ACP policies live: `unique` should create a safe unique NodeBB username, and `reject` should fail new SSO account creation without creating a user or mapping.
 - Capture actual OIDC claims for an Authentik account intended to be unverified. The live test is not complete until the emitted `email_verified` claim is confirmed to be boolean `false`.
 - Investigate the post-callback hang seen after repeat login. Confirm whether NodeBB is waiting on a response, redirecting to an interstitial, or completing login with a frontend routing issue.
 - Confirm stale `authentik:sub:uid` cleanup in live data by deleting a mapped test user and retrying with the same Authentik subject.
 
 ## Plugin Hardening
 
-- Add sanitized claim diagnostics for failed callbacks. Include rejection code, claim presence, `email_verified` type/value, issuer, and whether userinfo was used. Never store or log raw tokens.
-- Add optional admin-configurable authorization parameters for Authentik flows, especially `prompt=login` or `prompt=select_account`, to reduce accidental reuse of an existing Authentik browser session.
-- Add an admin setting for username-collision policy:
+- Expand sanitized diagnostics if live failures need more context. Current ACP diagnostics include rejection code, claim presence, `email_verified` type/value, issuer metadata, and whether userinfo was used; raw tokens and full claims are not stored.
+- Live-test admin-configurable authorization parameters for Authentik flows, especially `prompt=login` or `prompt=select_account`, to reduce accidental reuse of an existing Authentik browser session.
+- Decide which username-collision policy to recommend for first release:
   - `unique`: create a safe unique NodeBB username for new SSO users.
-  - `reject`: fail new SSO account creation if `preferred_username` conflicts with an existing NodeBB username/userslug.
+  - `reject`: fail new SSO account creation when NodeBB reports the username/userslug is unavailable.
 - Extend the new ACP mapping audit/repair tooling with CLI access if live operations need non-browser repair.
 - Add tests around NodeBB's userslug collision behavior, not only exact username matching.
 
@@ -69,11 +69,22 @@
   - Display name sync: update fullname from `name`.
   - Avatar sync: update NodeBB avatar from OIDC `picture` only if enabled and URL passes validation.
   - Custom field sync: map explicit OIDC claim names to NodeBB user fields.
+- Add role/group attachment synchronization as a separate, explicit subsystem:
+  - Map NodeBB groups to Authentik groups or roles through an ACP table.
+  - Support direction per mapping: Authentik to NodeBB, NodeBB to Authentik, or bidirectional.
+  - Example: membership in the NodeBB `Developers` group grants the Authentik `developers` role; leaving the NodeBB group removes that role when the mapping is configured as NodeBB-owned.
+  - Example: receiving an Authentik `developers` role/group claim adds the user to the NodeBB `Developers` group when the mapping is configured as Authentik-owned.
+  - Keep each mapping explicit: NodeBB group name/id, Authentik role/group identifier, direction, ownership policy, removal behavior, priority, and enabled flag.
+  - Require an Authentik management API token only for NodeBB to Authentik writes; OIDC login claims are enough only for Authentik to NodeBB reads.
+  - Add dry-run previews showing role/group additions and removals for a uid/sub before applying writes.
+  - Store per-user role sync audit fields such as `authentikLastRoleSyncedAt`, last applied mapping version, and last role sync status.
+  - Prevent sync loops with source-of-truth ownership, mapping versions, and a "do not echo remote changes back" rule for the same sync pass.
+  - Treat privileged groups as high-risk: require explicit confirmation before mappings affect admin/moderator or Authentik administrative roles.
 - Store sync audit fields on each user: `authentikLastSyncedAt`, `authentikLastEmail`, `authentikLastUsername`, and per-field sync status when practical.
 - Make synchronization happen after identity resolution by `sub`, never before identity resolution.
 - Treat synchronization failures as field-level warnings by default, not login failures, except for email conflicts or identity-critical fields.
-- Add dry-run diagnostics in ACP showing what would change for a selected uid/sub without applying writes.
-- Add tests for changed email, username conflict, avatar URL validation, missing claims, custom field mapping, and local user edits being overwritten only when sync is enabled.
+- Add dry-run diagnostics in ACP showing what profile fields and role/group attachments would change for a selected uid/sub without applying writes.
+- Add tests for changed email, username conflict, avatar URL validation, missing claims, custom field mapping, local user edits being overwritten only when sync is enabled, role/group mapping direction, removal behavior, loop prevention, and privileged-role guardrails.
 
 ## ACP Configuration And UX
 
@@ -81,7 +92,7 @@
   - Provider connection: enabled, display name, issuer, discovery, endpoints, JWKS URI, client id, client secret, scopes, callback URL.
   - Login behavior: authorization parameters, PKCE toggle, HTTPS development override, local login policy, registration/account creation policy.
   - Identity rules: verified-email requirement, username collision policy, email collision behavior, stale mapping cleanup behavior.
-  - Synchronization: per-field sync toggles for email, username, fullname, avatar, and custom claim mappings.
+  - Synchronization: per-field sync toggles for email, username, fullname, avatar, custom claim mappings, and role/group attachment mappings.
   - Diagnostics and repair: test discovery, test provider connection, inspect sanitized last failure, audit mappings, repair stale mappings.
 - Add switches and levers:
   - Enable/disable plugin.
@@ -91,6 +102,7 @@
   - Allow new SSO account creation versus link existing accounts only.
   - Username collision policy: generate unique, keep existing/local, or reject.
   - Sync toggles: email, username, display name, avatar, custom fields.
+  - Role/group attachment table: NodeBB group, Authentik role/group, direction, ownership/removal policy, priority, and enabled flag.
   - Avatar behavior: disabled, use provider `picture`, preserve local, or reset to NodeBB default.
   - Diagnostics mode with short retention.
 - Add validation and operator feedback:
@@ -104,9 +116,10 @@
   - "Test JWKS" verifies the JWKS endpoint is reachable and has supported signing keys.
   - "Show sanitized last failure" displays rejection code and claim presence/type metadata without tokens.
   - "Audit mappings" lists stale `sub` mappings, users with `authentikSub` but missing reverse mapping, and duplicate mappings.
-  - "Dry-run sync" shows what fields would change for a selected uid or `sub`.
+  - "Dry-run sync" shows what profile fields and role/group attachments would change for a selected uid or `sub`.
 - Add safety guardrails:
   - Require confirmation before enabling account creation, destructive repair actions, or sync modes that overwrite local profile fields.
+  - Require confirmation before enabling bidirectional role sync or mappings that touch NodeBB privileged groups or Authentik administrative roles.
   - Do not display raw client secret, tokens, authorization codes, ID tokens, or full claim payloads in ACP.
   - Mark development-only settings clearly and keep them disabled by default.
 - Add ACP tests or fixtures for save/reload, placeholder secret preservation, discovery preview, validation errors, toggles, and diagnostics endpoints.

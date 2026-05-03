@@ -111,6 +111,25 @@ define('admin/plugins/authentik-oidc', ['alerts'], function (alerts) {
 		$('[data-action="repair-stale-mappings"]').prop('disabled', !(summary.staleMappings > 0));
 	}
 
+	function renderLastFailure(result) {
+		if (!result || !result.at) {
+			$('[data-authentik-last-failure]').text('No failure diagnostics recorded.');
+			return;
+		}
+		$('[data-authentik-last-failure]').text(JSON.stringify({
+			at: new Date(parseInt(result.at, 10)).toISOString(),
+			stage: result.stage,
+			code: result.code,
+			message: result.message,
+			level: result.level,
+			configuredIssuer: result.configuredIssuer,
+			userinfoUsed: result.userinfoUsed,
+			idTokenClaims: result.idTokenClaims,
+			userinfoClaims: result.userinfoClaims,
+			mergedClaims: result.mergedClaims,
+		}, null, 2));
+	}
+
 	Admin.init = async function () {
 		fill(await get('/settings'));
 
@@ -151,6 +170,15 @@ define('admin/plugins/authentik-oidc', ['alerts'], function (alerts) {
 				alerts.success('Mapping audit completed');
 			} catch (err) {
 				alerts.error(err.message || 'Mapping audit failed');
+			}
+		});
+
+		$('[data-action="show-last-failure"]').on('click', async function () {
+			try {
+				renderLastFailure(await get('/diagnostics/last-failure'));
+				alerts.success('Loaded last failure diagnostics');
+			} catch (err) {
+				alerts.error(err.message || 'Failed to load diagnostics');
 			}
 		});
 

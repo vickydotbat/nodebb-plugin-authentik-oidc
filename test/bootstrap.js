@@ -40,6 +40,7 @@ function createMocks() {
 		users: new Map(),
 		emailToUid: new Map(),
 		subToUid: new Map(),
+		objects: new Map(),
 	};
 
 	const logger = {
@@ -100,22 +101,30 @@ function createMocks() {
 	};
 
 	const db = {
-		async getObjectField(key, field) {
-			if (key === 'authentik:sub:uid') {
-				return state.subToUid.get(field) || null;
-			}
-			return null;
-		},
 		async getObject(key) {
 			if (key === 'authentik:sub:uid') {
 				return Object.fromEntries(state.subToUid.entries());
 			}
-			return {};
+			return state.objects.get(key) || {};
+		},
+		async setObject(key, value) {
+			state.objects.set(key, value);
+		},
+		async getObjectField(key, field) {
+			if (key === 'authentik:sub:uid') {
+				return state.subToUid.get(field) || null;
+			}
+			const object = state.objects.get(key) || {};
+			return object[field] || null;
 		},
 		async setObjectField(key, field, value) {
 			if (key === 'authentik:sub:uid') {
 				state.subToUid.set(field, parseInt(value, 10));
+				return;
 			}
+			const object = state.objects.get(key) || {};
+			object[field] = value;
+			state.objects.set(key, object);
 		},
 		async deleteObjectField(key, field) {
 			if (key === 'authentik:sub:uid') {

@@ -17,6 +17,9 @@ Covered baseline cases:
 - String `"true"` for `email_verified` rejects.
 - Mapping audit reports healthy, stale, missing reverse, conflicting reverse, and duplicate user-side subject links.
 - Stale mapping repair requires explicit confirmation and removes only mappings whose uid no longer exists.
+- Authorization parameters are appended to the provider redirect while plugin-controlled OIDC parameters cannot be overridden.
+- Username collision reject policy fails closed without creating a user or mapping.
+- Last failure diagnostics store sanitized claim metadata without raw tokens or email addresses.
 
 ## Manual Authentik Integration
 
@@ -45,6 +48,8 @@ Covered baseline cases:
 - Confirm a deliberate `sub`/email collision fails closed and logs a warning.
 - In ACP, run Identity Mapping Diagnostics and confirm the audit summary matches the database.
 - If stale mappings exist, use Repair stale and confirm only mappings pointing to missing NodeBB users are removed.
+- Use Last failure after a rejected callback and confirm it shows only sanitized metadata needed to inspect `email_verified` behavior.
+- Test optional authorization parameters such as `prompt=login` or `prompt=select_account` if Authentik session reuse causes account-selection confusion.
 
 ## Manual Observations
 
@@ -67,7 +72,7 @@ Covered baseline cases:
 
 ## Open Live Items
 
-- Retest username collision after deciding whether the intended behavior is "create a safe unique username" or "block SSO account creation when preferred username already exists".
+- Retest username collision in both ACP policies: "create a safe unique username" and "reject new SSO account creation".
 - Capture actual OIDC ID token/userinfo claims for the `email_verified: false` scenario. Do not rely on Authentik custom attributes alone.
 - Investigate Authentik account-selection/avatar behavior. Decide whether to add optional `prompt=login`, `prompt=select_account`, or an admin-configurable authorization parameter field.
 - Investigate post-callback hang after successful login and confirm whether the callback response/redirect chain completes cleanly.

@@ -11,13 +11,15 @@ Build a minimal, maintained NodeBB plugin that supports Authentik and standards-
 
 ## Current Repository State
 
-The repository is currently initialized only with:
+The repository now contains the first working plugin implementation:
 
-- `AGENTS.md`: product, security, and delivery requirements.
-- `README.md`: placeholder project title.
-- `docs/IMPLEMENTATION_PLAN.md`: this expanded plan.
+- NodeBB plugin manifest, auth strategy registration, ACP route registration, and admin navigation.
+- Direct OAuth2/OIDC code flow with state, nonce, optional PKCE, ID token validation, userinfo retrieval, and issuer/audience validation.
+- Strict identity resolution by `sub` with verified-email linking, stale mapping cleanup, collision rejection, and create-time username retry handling.
+- ACP settings with discovery, secret-preserving saves, authorization parameters, username collision policy, sanitized last-failure diagnostics, mapping audit, and stale mapping repair.
+- Automated unit tests for identity safety, discovery issuer handling, authorization parameter handling, diagnostics sanitization, username generation, and mapping audit/repair.
 
-No plugin runtime files exist yet. The first implementation pass should add the package metadata, NodeBB plugin manifest, server entrypoint, admin template, ACP script, tests or fixtures, and README content.
+Remaining release work is mostly live verification against the target NodeBB/AuthentiK environment and operator documentation polish.
 
 ## Confirmed NodeBB Conventions
 
