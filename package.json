@@ -1,0 +1,42 @@
+{
+  "name": "nodebb-plugin-authentik-oidc",
+  "version": "0.1.0",
+  "description": "Authentik-compatible OAuth2/OIDC SSO for NodeBB with strict verified-email identity linking.",
+  "main": "library.js",
+  "files": [
+    "README.md",
+    "docs/",
+    "languages/",
+    "lib/",
+    "library.js",
+    "plugin.json",
+    "public/",
+    "templates/"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/vicky/nodebb-plugin-authentik-oidc.git"
+  },
+  "keywords": [
+    "nodebb",
+    "plugin",
+    "authentik",
+    "oidc",
+    "oauth2",
+    "sso"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "jsonwebtoken": "^9.0.3",
+    "passport-strategy": "^1.0.0"
+  },
+  "nbbpm": {
+    "compatibility": "^4.0.0"
+  }
+}

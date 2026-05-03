@@ -1,0 +1,96 @@
+'use strict';
+
+const passport = module.parent.require('passport');
+const routeHelpers = require.main.require('./src/routes/helpers');
+const privileges = require.main.require('./src/privileges');
+
+const admin = require('./lib/admin');
+const config = require('./lib/config');
+const AuthentikOidcStrategy = require('./lib/strategy');
+
+const plugin = module.exports;
+
+plugin.init = async function ({ router }) {
+	await config.ensureDefaults();
+	routeHelpers.setupAdminPageRoute(router, '/admin/plugins/authentik-oidc', admin.renderAdminPage);
+};
+
+plugin.registerApiRoutes = async function ({ router, middleware }) {
+	const adminMiddlewares = [middleware.ensureLoggedIn, ensureSettingsAdmin];
+
+	routeHelpers.setupApiRoute(
+		router,
+		'get',
+		'/authentik-oidc/settings',
+		adminMiddlewares,
+		admin.getSettings
+	);
+	routeHelpers.setupApiRoute(
+		router,
+		'post',
+		'/authentik-oidc/settings',
+		adminMiddlewares,
+		admin.saveSettings
+	);
+	routeHelpers.setupApiRoute(
+		router,
+		'post',
+		'/authentik-oidc/discover',
+		adminMiddlewares,
+		admin.discover
+	);
+};
+
+async function ensureSettingsAdmin(req, res, next) {
+	if (!await privileges.admin.can('admin:settings', req.uid)) {
+		return res.status(403).json({ message: 'Not allowed' });
+	}
+	next();
+}
+
+plugin.addAdminNavigation = async function (header) {
+	header.authentication.push({
+		route: '/plugins/authentik-oidc',
+		icon: 'fa-lock',
+		name: 'Authentik OIDC',
+	});
+	return header;
+};
+
+plugin.initAuth = async function (strategies) {
+	const settings = await config.getSettings();
+	if (!settings.enabled) {
+		return strategies;
+	}
+
+	passport.use('authentik', new AuthentikOidcStrategy({ config }));
+	strategies.push({
+		name: 'authentik',
+		url: '/auth/authentik',
+		callbackURL: '/auth/authentik/callback',
+		icon: 'fa-right-to-bracket',
+		icons: {
+			normal: 'fa fa-right-to-bracket',
+			square: 'fa fa-right-to-bracket',
+		},
+		labels: {
+			login: settings.displayName || 'Authentik',
+			register: settings.displayName || 'Authentik',
+		},
+		color: '#fd4b2d',
+		scope: settings.scopes || config.DEFAULTS.scopes,
+		checkState: true,
+	});
+	return strategies;
+};
+
+plugin.whitelistUserFields = async function (payload) {
+	payload.whitelist.push(
+		'authentikSub',
+		'authentikIssuer',
+		'authentikLinkedAt',
+		'authentikLastLoginAt',
+		'authentikLastEmail'
+	);
+	return payload;
+};

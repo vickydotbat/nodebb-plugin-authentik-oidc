@@ -1,0 +1,37 @@
+{
+  "id": "nodebb-plugin-authentik-oidc",
+  "name": "Authentik OIDC",
+  "description": "Authentik-compatible OAuth2/OIDC SSO with strict verified-email identity linking.",
+  "settingsRoute": "/admin/plugins/authentik-oidc",
+  "library": "./library.js",
+  "modules": {
+    "../admin/plugins/authentik-oidc.js": "./public/admin.js"
+  },
+  "templates": "templates",
+  "languages": "languages",
+  "staticDirs": {
+    "public": "public"
+  },
+  "hooks": [
+    {
+      "hook": "static:app.load",
+      "method": "init"
+    },
+    {
+      "hook": "static:api.routes",
+      "method": "registerApiRoutes"
+    },
+    {
+      "hook": "filter:admin.header.build",
+      "method": "addAdminNavigation"
+    },
+    {
+      "hook": "filter:auth.init",
+      "method": "initAuth"
+    },
+    {
+      "hook": "filter:user.whitelistFields",
+      "method": "whitelistUserFields"
+    }
+  ]
+}
