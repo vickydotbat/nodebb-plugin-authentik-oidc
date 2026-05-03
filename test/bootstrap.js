@@ -75,6 +75,11 @@ function createMocks() {
 			data[field] = value;
 		},
 		async create(data) {
+			for (const existing of state.users.values()) {
+				if (String(existing.username).toLowerCase() === String(data.username).toLowerCase()) {
+					throw new Error('[[error:username-taken]]');
+				}
+			}
 			const uid = state.nextUid;
 			state.nextUid += 1;
 			state.users.set(uid, { uid, ...data, 'email:confirmed': 1 });

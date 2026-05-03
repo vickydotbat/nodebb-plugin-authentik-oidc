@@ -130,6 +130,42 @@ test('username conflict creates safe unique username', async () => {
 	}
 });
 
+test('username conflict detected by create retries with safe unique username', async () => {
+	const mocks = createMocks();
+	mocks.state.users.set(7, { uid: 7, username: 'Person' });
+	const { identity, restore } = loadIdentity(mocks);
+	try {
+		const result = await identity.resolve(verified({ email: 'other@example.com' }), { issuer: 'https://id.example.com' });
+		assert.equal(mocks.state.users.get(result.uid).username, 'person-1');
+	} finally {
+		restore();
+	}
+});
+
+test('email race during user creation links existing verified email without duplicate', async () => {
+	const mocks = createMocks();
+	let createdDuringRace = false;
+	const originalCreate = mocks.user.create;
+	mocks.user.create = async (data, opts) => {
+		if (!createdDuringRace) {
+			createdDuringRace = true;
+			mocks.state.users.set(42, { uid: 42, username: 'race', email: data.email });
+			mocks.state.emailToUid.set(data.email.toLowerCase(), 42);
+			throw new Error('[[error:email-taken]]');
+		}
+		return await originalCreate(data, opts);
+	};
+	const { identity, restore } = loadIdentity(mocks);
+	try {
+		const result = await identity.resolve(verified(), { issuer: 'https://id.example.com' });
+		assert.equal(result.uid, 42);
+		assert.equal(mocks.state.users.size, 1);
+		assert.equal(mocks.state.subToUid.get('sub-1'), 42);
+	} finally {
+		restore();
+	}
+});
+
 test('sub mapped to uid A but verified email belongs to uid B fails safely', async () => {
 	const mocks = createMocks();
 	mocks.state.users.set(1, { uid: 1, username: 'a', email: 'a@example.com' });
