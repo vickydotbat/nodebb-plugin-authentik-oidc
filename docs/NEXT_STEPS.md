@@ -20,9 +20,12 @@
 
 ### P2: NodeBB User Profile Controls
 
-- Add user-facing profile controls for viewing OIDC link state and controlling NodeBB-owned preferences.
-- Expose Authentik-managed profile actions through redirects or clearly marked external links where practical.
+- Added a user-facing read-only linked-account page at `/user/<userslug>/authentik-oidc`.
+- Added a self-only profile menu link for the linked-account page.
+- Added ACP-configurable Authentik self-service links for profile, password, MFA, and sessions.
+- Exposed only safe link metadata: linked status, provider display name, issuer, link/login timestamps, last provider email, managed-field status, and configured external actions.
 - Do not let users edit identity-critical OIDC state from NodeBB. `sub`, issuer, and verified-email link mappings remain admin/plugin controlled.
+- Deferred refresh and disconnect controls until the OIDC flow can enforce the stored linked `sub` for those actions.
 
 ### P3: Profile Synchronization
 
@@ -126,15 +129,24 @@
 
 ## User Profile OIDC Controls
 
-- Add a NodeBB user settings/profile panel for linked accounts that initially shows only NodeBB-controlled information:
+Implemented:
+
+- Add a NodeBB user account page for linked accounts that initially shows only safe information:
   - Linked status.
   - Provider display name.
   - Linked issuer.
+  - Linked timestamp.
   - Last login time.
-  - Last sync time.
   - Last provider email seen.
-  - Whether the current NodeBB email is provider-verified.
   - Which local fields are managed by Authentik sync.
+- Add ACP-configurable URLs for external Authentik profile, password, MFA, and session actions.
+- Add a self-only profile menu entry.
+- Keep `authentikSub` and reverse mapping keys server-side only.
+
+Remaining:
+
+- Add last sync time once profile synchronization exists.
+- Show whether the current NodeBB email is provider-verified once email sync policy exists.
 - Add user-facing NodeBB controls where safe:
   - Re-run Authentik login to refresh/sync profile data.
   - Disconnect Authentik only if local login/password or another safe login method exists, and only if admin policy allows disconnect.
@@ -145,7 +157,6 @@
   - Link to Authentik password/account settings if configured.
   - Link to Authentik MFA/device settings if configured.
   - Link to Authentik consent/session management if configured.
-- Add ACP-configurable URLs for those external actions rather than hardcoding Authentik paths.
 - Add clear read-only labels for Authentik-managed fields. If username, email, display name, or avatar sync is enabled, the NodeBB profile UI should explain that changes must be made in Authentik.
 - Add guardrails:
   - Users cannot edit or delete `authentikSub`, issuer, or reverse mapping.

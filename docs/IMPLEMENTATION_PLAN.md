@@ -16,10 +16,11 @@ The repository now contains the first working plugin implementation:
 - NodeBB plugin manifest, auth strategy registration, ACP route registration, and admin navigation.
 - Direct OAuth2/OIDC code flow with state, nonce, optional PKCE, ID token validation, userinfo retrieval, and issuer/audience validation.
 - Strict identity resolution by `sub` with verified-email linking, stale mapping cleanup, collision rejection, and create-time username retry handling.
-- ACP settings with discovery, secret-preserving saves, authorization parameters, username collision policy, sanitized last-failure diagnostics, mapping audit, and stale mapping repair.
-- Automated unit tests for identity safety, discovery issuer handling, authorization parameter handling, diagnostics sanitization, username generation, and mapping audit/repair.
+- ACP settings with discovery, secret-preserving saves, authorization parameters, username collision policy, sanitized last-failure diagnostics, JWKS health checks, mapping audit, stale mapping repair, and optional Authentik self-service URLs.
+- A self-only user account page that shows linked-account state and configured external Authentik self-service actions without exposing OIDC subjects or mapping keys.
+- Automated unit tests for identity safety, discovery issuer handling, authorization parameter handling, diagnostics sanitization, JWKS checks, username generation, mapping audit/repair, and user-facing linked-account state.
 
-Remaining release work is mostly live verification against the target NodeBB/AuthentiK environment and operator documentation polish.
+Remaining release work is mostly live verification against the target NodeBB/AuthentiK environment, profile synchronization design, and operator documentation polish.
 
 ## Confirmed NodeBB Conventions
 

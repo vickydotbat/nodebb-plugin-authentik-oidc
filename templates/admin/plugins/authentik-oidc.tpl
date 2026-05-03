@@ -86,6 +86,30 @@
 				</div>
 
 				<div class="mb-3">
+					<label class="form-label" for="selfServiceProfileUrl">Self-service profile URL</label>
+					<input class="form-control" id="selfServiceProfileUrl" type="url" data-authentik-field="selfServiceProfileUrl">
+					<div class="form-text text-danger" data-authentik-error="selfServiceProfileUrl"></div>
+				</div>
+
+				<div class="mb-3">
+					<label class="form-label" for="selfServicePasswordUrl">Self-service password URL</label>
+					<input class="form-control" id="selfServicePasswordUrl" type="url" data-authentik-field="selfServicePasswordUrl">
+					<div class="form-text text-danger" data-authentik-error="selfServicePasswordUrl"></div>
+				</div>
+
+				<div class="mb-3">
+					<label class="form-label" for="selfServiceMfaUrl">Self-service MFA URL</label>
+					<input class="form-control" id="selfServiceMfaUrl" type="url" data-authentik-field="selfServiceMfaUrl">
+					<div class="form-text text-danger" data-authentik-error="selfServiceMfaUrl"></div>
+				</div>
+
+				<div class="mb-3">
+					<label class="form-label" for="selfServiceSessionsUrl">Self-service sessions URL</label>
+					<input class="form-control" id="selfServiceSessionsUrl" type="url" data-authentik-field="selfServiceSessionsUrl">
+					<div class="form-text text-danger" data-authentik-error="selfServiceSessionsUrl"></div>
+				</div>
+
+				<div class="mb-3">
 					<label class="form-label" for="usernameCollisionPolicy">Username collision policy</label>
 					<select class="form-select" id="usernameCollisionPolicy" data-authentik-field="usernameCollisionPolicy">
 						<option value="unique">Create a unique NodeBB username</option>

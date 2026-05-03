@@ -11,12 +11,13 @@ Authentik-compatible OAuth2/OIDC SSO for NodeBB with strict verified-email ident
 - Rejects `sub`/email collisions instead of silently creating duplicate users.
 - Keeps username display-only and never uses it for identity matching.
 - Provides an ACP settings page with issuer discovery, secret-preserving saves, authorization parameters, username collision policy, sanitized last-failure diagnostics, mapping audit, and stale mapping repair.
+- Provides a read-only user account page for linked Authentik/OIDC status and optional Authentik self-service links without exposing OIDC subjects or mapping keys.
 
 Planned profile and role/group synchronization work is tracked in [Next steps](docs/NEXT_STEPS.md). Authentik profile data such as username, email, display name, avatar, groups, and roles should be synced only through explicit admin settings after identity resolution succeeds.
 
 Planned ACP improvements include grouped settings, sync toggles, authorization-parameter controls, broader diagnostics, and dry-run profile synchronization.
 
-Planned user-profile controls include linked-account status, managed-field indicators, safe profile refresh, optional disconnect policy, and redirects to configured Authentik self-service pages.
+User-profile controls are currently read-only. Safe profile refresh and disconnect policies are intentionally deferred until the login flow can constrain those actions to the already linked OIDC `sub`.
 
 ## Install During Development
 
@@ -71,6 +72,8 @@ Use Identity Mapping Diagnostics in the ACP to audit `authentik:sub:uid` mapping
 Use Last failure in the ACP diagnostics section when an OIDC callback is rejected. It stores only sanitized metadata such as rejection code, claim presence, `email_verified` type/value, issuer metadata, and whether userinfo was used. It does not store raw tokens, authorization codes, full claim payloads, or email addresses.
 
 The username collision policy defaults to creating a safe unique NodeBB username for new SSO users. Set it to reject if new SSO account creation should fail when the provider's display username conflicts with an existing NodeBB username/userslug.
+
+Optional Authentik self-service URLs can be configured in the ACP. When set, linked users see those external profile, password, MFA, and session-management links on `/user/<userslug>/authentik-oidc`.
 
 ## Tests
 

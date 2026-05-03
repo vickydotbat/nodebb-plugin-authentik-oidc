@@ -19,6 +19,12 @@ function installNodebbMocks(mocks) {
 		if (request === './src/user') {
 			return mocks.user;
 		}
+		if (request === './src/meta') {
+			return mocks.meta;
+		}
+		if (request === 'nconf') {
+			return mocks.nconf;
+		}
 		if (request === './src/logger' || request === './src/winston') {
 			return mocks.logger;
 		}
@@ -41,6 +47,7 @@ function createMocks() {
 		emailToUid: new Map(),
 		subToUid: new Map(),
 		objects: new Map(),
+		settings: new Map(),
 	};
 
 	const logger = {
@@ -149,7 +156,32 @@ function createMocks() {
 		},
 	};
 
-	return { state, user, db, logger };
+	const meta = {
+		settings: {
+			async get(key) {
+				return state.settings.get(key) || {};
+			},
+			async set(key, value) {
+				state.settings.set(key, { ...value });
+			},
+			async setOnEmpty(key, value) {
+				if (!state.settings.has(key)) {
+					state.settings.set(key, { ...value });
+				}
+			},
+		},
+	};
+
+	const nconf = {
+		get(key) {
+			if (key === 'url') {
+				return 'https://forum.example.com';
+			}
+			return undefined;
+		},
+	};
+
+	return { state, user, db, logger, meta, nconf };
 }
 
 module.exports = {

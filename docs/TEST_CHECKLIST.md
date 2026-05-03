@@ -20,6 +20,10 @@ Covered baseline cases:
 - Authorization parameters are appended to the provider redirect while plugin-controlled OIDC parameters cannot be overridden.
 - Username collision reject policy fails closed without creating a user or mapping.
 - Last failure diagnostics store sanitized claim metadata without raw tokens or email addresses.
+- JWKS diagnostics report only sanitized signing-key metadata and fail when no supported signing key exists.
+- Authentik self-service URLs are trimmed, saved, and validated as optional HTTPS settings.
+- User linked-account state exposes safe metadata without the OIDC subject or mapping keys.
+- The profile menu link is self-only.
 
 ## Manual Authentik Integration
 
@@ -50,6 +54,8 @@ Covered baseline cases:
 - If stale mappings exist, use Repair stale and confirm only mappings pointing to missing NodeBB users are removed.
 - Use Last failure after a rejected callback and confirm it shows only sanitized metadata needed to inspect `email_verified` behavior.
 - Test optional authorization parameters such as `prompt=login` or `prompt=select_account` if Authentik session reuse causes account-selection confusion.
+- Configure Authentik self-service profile, password, MFA, and session URLs in the ACP and confirm `/user/<userslug>/authentik-oidc` shows only those external actions for the signed-in linked user.
+- Confirm the linked-account page does not display the OIDC `sub`, raw claims, tokens, or database mapping keys.
 
 ## Manual Observations
 
@@ -77,3 +83,4 @@ Covered baseline cases:
 - Investigate Authentik account-selection/avatar behavior. Decide whether to add optional `prompt=login`, `prompt=select_account`, or an admin-configurable authorization parameter field.
 - Investigate post-callback hang after successful login and confirm whether the callback response/redirect chain completes cleanly.
 - Add Authentik-side flow/policy rules to reject registration when username or email already exists in Authentik, and document that NodeBB can only enforce checks after OIDC claims return.
+- Live-test the linked-account profile page after rebuilding NodeBB and confirm the self-only profile menu route renders under the active theme.

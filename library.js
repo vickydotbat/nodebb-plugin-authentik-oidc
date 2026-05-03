@@ -6,13 +6,20 @@ const privileges = require.main.require('./src/privileges');
 
 const admin = require('./lib/admin');
 const config = require('./lib/config');
+const profile = require('./lib/profile');
 const AuthentikOidcStrategy = require('./lib/strategy');
 
 const plugin = module.exports;
 
-plugin.init = async function ({ router }) {
+plugin.init = async function ({ router, middleware }) {
 	await config.ensureDefaults();
 	routeHelpers.setupAdminPageRoute(router, '/admin/plugins/authentik-oidc', admin.renderAdminPage);
+	routeHelpers.setupPageRoute(router, '/user/:userslug/authentik-oidc', [
+		middleware.exposeUid,
+		middleware.ensureLoggedIn,
+		middleware.canViewUsers,
+		middleware.checkAccountPermissions,
+	], profile.renderLinkedAccountPage);
 };
 
 plugin.registerApiRoutes = async function ({ router, middleware }) {
@@ -84,6 +91,8 @@ plugin.addAdminNavigation = async function (header) {
 	});
 	return header;
 };
+
+plugin.addProfileMenuItem = profile.addProfileMenuItem;
 
 plugin.initAuth = async function (strategies) {
 	const settings = await config.getSettings();

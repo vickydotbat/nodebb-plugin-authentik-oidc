@@ -26,6 +26,10 @@
       "method": "addAdminNavigation"
     },
     {
+      "hook": "filter:user.profileMenu",
+      "method": "addProfileMenuItem"
+    },
+    {
       "hook": "filter:auth.init",
       "method": "initAuth"
     },

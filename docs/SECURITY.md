@@ -17,6 +17,8 @@ Secrets, authorization codes, access tokens, refresh tokens, and raw ID tokens m
 
 The ACP Last failure diagnostic stores only sanitized failure metadata: rejection code, stage, issuer metadata, claim presence flags, `email_verified` type/value, and whether userinfo contributed claims. It deliberately does not store raw tokens, authorization codes, full ID token/userinfo payloads, email addresses, or usernames.
 
+The user-facing linked-account page deliberately does not expose the OIDC `sub`, reverse mapping keys, raw claims, tokens, or authorization artifacts. It shows only linked status, provider display name, issuer, timestamps, the last provider email seen by the plugin, and configured external self-service links.
+
 ## Provider Boundary
 
 The plugin can only enforce identity rules after Authentik redirects back with OIDC claims. It cannot stop Authentik from creating or verifying an Authentik-side account during an upstream enrollment flow. Authentik flows and policies should block provider-side registration when a username or email is already in use, when email is missing, or when the user has not completed the intended verification step.
@@ -67,3 +69,5 @@ Allowed user-facing controls should be limited to safe actions:
 - View which local profile fields are Authentik-managed.
 
 Disconnect and refresh actions require CSRF protection and must resolve the linked account by stored `sub`. They must never accept a username, email, or arbitrary provider subject supplied by the browser as authority.
+
+Current implementation status: the user-facing page is read-only and supports only configured external Authentik self-service links. Refresh and disconnect actions remain deferred until they can enforce the stored `sub` during the OIDC round trip.
