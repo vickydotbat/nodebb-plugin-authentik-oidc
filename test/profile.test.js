@@ -66,6 +66,29 @@ test('unlinked account state is read-only and has no provider actions by default
 	}
 });
 
+test('linked account state filters unsafe external action URLs', async () => {
+	const mocks = createMocks();
+	mocks.state.users.set(1, {
+		uid: 1,
+		username: 'linked',
+		authentikSub: 'sub-secret-value',
+	});
+	const { profile, restore } = loadProfile(mocks);
+	try {
+		const state = await profile.getLinkedAccountState(1, {
+			selfServiceProfileUrl: 'javascript:alert(1)',
+			selfServicePasswordUrl: 'https://127.0.0.1/password',
+			selfServiceMfaUrl: 'https://auth.example.com/mfa',
+			selfServiceSessionsUrl: '',
+		});
+		assert.deepEqual(state.externalLinks.map(link => link.id), ['mfa']);
+		assert.equal(JSON.stringify(state).includes('javascript:'), false);
+		assert.equal(JSON.stringify(state).includes('127.0.0.1'), false);
+	} finally {
+		restore();
+	}
+});
+
 test('profile menu item is self-only', async () => {
 	const mocks = createMocks();
 	const { profile, restore } = loadProfile(mocks);

@@ -47,6 +47,7 @@
 
 ## Plugin Hardening
 
+- Security audit tightened outbound URL validation, JWKS signing-key selection, unsafe self-service link filtering, missing-state handling, and provider error callbacks.
 - Expand sanitized diagnostics if live failures need more context. Current ACP diagnostics include rejection code, claim presence, `email_verified` type/value, issuer metadata, and whether userinfo was used; raw tokens and full claims are not stored.
 - Live-test admin-configurable authorization parameters for Authentik flows, especially `prompt=login` or `prompt=select_account`, to reduce accidental reuse of an existing Authentik browser session.
 - Decide which username-collision policy to recommend for first release:
@@ -54,6 +55,7 @@
   - `reject`: fail new SSO account creation when NodeBB reports the username/userslug is unavailable.
 - Extend the new ACP mapping audit/repair tooling with CLI access if live operations need non-browser repair.
 - Add tests around NodeBB's userslug collision behavior, not only exact username matching.
+- Consider DNS resolution checks before outbound discovery/JWKS fetches to catch hostnames that resolve to private IP addresses.
 
 ## Avatar Investigation
 

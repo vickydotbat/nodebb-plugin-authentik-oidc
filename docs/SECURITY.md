@@ -19,6 +19,8 @@ The ACP Last failure diagnostic stores only sanitized failure metadata: rejectio
 
 The user-facing linked-account page deliberately does not expose the OIDC `sub`, reverse mapping keys, raw claims, tokens, or authorization artifacts. It shows only linked status, provider display name, issuer, timestamps, the last provider email seen by the plugin, and configured external self-service links.
 
+Admin-triggered provider discovery, JWKS diagnostics, provider endpoints, and self-service links are restricted to HTTPS URLs by default and reject localhost or private network targets. Loopback HTTP is allowed only when the explicit development override is enabled. This reduces SSRF risk from ACP diagnostics and prevents unsafe links from being rendered to users.
+
 ## Provider Boundary
 
 The plugin can only enforce identity rules after Authentik redirects back with OIDC claims. It cannot stop Authentik from creating or verifying an Authentik-side account during an upstream enrollment flow. Authentik flows and policies should block provider-side registration when a username or email is already in use, when email is missing, or when the user has not completed the intended verification step.
@@ -32,6 +34,7 @@ For live testing, do not assume Authentik custom attributes change OIDC claims. 
 - Evaluate whether the strict username-collision policy should become the recommended release default for this installation. This is a product/admin policy, not an identity-safety requirement.
 - Add cleanup tooling for stale `authentik:sub:uid` mappings and duplicate test accounts created during early live testing.
 - Document Authentik flow policies for rejecting missing email and pre-existing username/email before provider-side account creation completes.
+- Consider DNS resolution checks for discovery/JWKS requests if the deployment allows arbitrary hostnames that can resolve to private addresses.
 
 ## Profile Synchronization Security
 

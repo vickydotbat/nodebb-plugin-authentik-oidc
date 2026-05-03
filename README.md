@@ -71,6 +71,8 @@ Use Identity Mapping Diagnostics in the ACP to audit `authentik:sub:uid` mapping
 
 Use Last failure in the ACP diagnostics section when an OIDC callback is rejected. It stores only sanitized metadata such as rejection code, claim presence, `email_verified` type/value, issuer metadata, and whether userinfo was used. It does not store raw tokens, authorization codes, full claim payloads, or email addresses.
 
+Provider URLs and self-service links must be HTTPS by default and cannot target localhost or private network addresses. The loopback HTTP exception is only for explicit local development.
+
 The username collision policy defaults to creating a safe unique NodeBB username for new SSO users. Set it to reject if new SSO account creation should fail when the provider's display username conflicts with an existing NodeBB username/userslug.
 
 Optional Authentik self-service URLs can be configured in the ACP. When set, linked users see those external profile, password, MFA, and session-management links on `/user/<userslug>/authentik-oidc`.

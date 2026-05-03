@@ -22,8 +22,11 @@ Covered baseline cases:
 - Last failure diagnostics store sanitized claim metadata without raw tokens or email addresses.
 - JWKS diagnostics report only sanitized signing-key metadata and fail when no supported signing key exists.
 - Authentik self-service URLs are trimmed, saved, and validated as optional HTTPS settings.
+- Provider URL validation rejects localhost/private network targets by default.
 - User linked-account state exposes safe metadata without the OIDC subject or mapping keys.
 - The profile menu link is self-only.
+- OIDC state is generated when missing, required on callback, and single-use.
+- ID token validation rejects unsupported algorithms and ignores non-signing JWKS keys.
 
 ## Manual Authentik Integration
 

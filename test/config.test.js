@@ -63,3 +63,39 @@ test('invalid self-service URLs produce field-level validation errors', async ()
 		restore();
 	}
 });
+
+test('self-service URLs are validated even when login is disabled', async () => {
+	const mocks = createMocks();
+	const { config, restore } = loadConfig(mocks);
+	try {
+		await assert.rejects(
+			config.saveSettings({
+				enabled: false,
+				selfServiceProfileUrl: 'javascript:alert(1)',
+			}),
+			(err) => {
+				assert.equal(err.errors.selfServiceProfileUrl, 'Must be an HTTPS URL');
+				return true;
+			}
+		);
+	} finally {
+		restore();
+	}
+});
+
+test('provider URLs reject private network targets by default', () => {
+	const mocks = createMocks();
+	const { config, restore } = loadConfig(mocks);
+	try {
+		assert.throws(
+			() => config.assertSafeUrl('https://127.0.0.1:9443/application/o/nodebb/', 'issuer'),
+			/Must not target localhost or private network addresses/
+		);
+		assert.throws(
+			() => config.assertSafeUrl('https://192.168.1.20/application/o/nodebb/', 'issuer'),
+			/Must not target localhost or private network addresses/
+		);
+	} finally {
+		restore();
+	}
+});

@@ -3,6 +3,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const Module = require('node:module');
+const crypto = require('node:crypto');
 
 function loadOidc() {
 	const originalLoad = Module._load;
@@ -28,6 +29,39 @@ function loadOidcWithJwks(keys) {
 	Module._load = function (request, parent, isMain) {
 		if (request === 'jsonwebtoken') {
 			return {};
+		}
+		if (request === './http' && parent && parent.filename.endsWith('/lib/oidc.js')) {
+			return {
+				async requestJson() {
+					return { keys };
+				},
+			};
+		}
+		return originalLoad.call(this, request, parent, isMain);
+	};
+	delete require.cache[require.resolve('../lib/oidc')];
+	const oidc = require('../lib/oidc');
+	return {
+		oidc,
+		restore() {
+			Module._load = originalLoad;
+			delete require.cache[require.resolve('../lib/oidc')];
+		},
+	};
+}
+
+function loadOidcForIdToken({ header, keys }) {
+	const originalLoad = Module._load;
+	Module._load = function (request, parent, isMain) {
+		if (request === 'jsonwebtoken') {
+			return {
+				decode() {
+					return { header };
+				},
+				verify() {
+					return { sub: 'sub-1', nonce: 'nonce-1' };
+				},
+			};
 		}
 		if (request === './http' && parent && parent.filename.endsWith('/lib/oidc.js')) {
 			return {
@@ -123,6 +157,53 @@ test('JWKS test fails when no supported signing keys are available', async () =>
 		await assert.rejects(
 			oidc.testJwks('https://auth.example.com/jwks/'),
 			/JWKS did not include supported signing keys/
+		);
+	} finally {
+		restore();
+	}
+});
+
+test('ID token verification rejects unsupported algorithms before key selection', async () => {
+	const { oidc, restore } = loadOidcForIdToken({
+		header: { alg: 'HS256', kid: 'shared-secret' },
+		keys: [{ kty: 'oct', kid: 'shared-secret' }],
+	});
+	try {
+		await assert.rejects(
+			oidc.verifyIdToken({
+				jwksUri: 'https://auth.example.com/jwks/',
+				clientId: 'nodebb',
+				issuer: 'https://auth.example.com/application/o/nodebb/',
+			}, 'token', 'nonce-1'),
+			/unsupported signing algorithm/
+		);
+	} finally {
+		restore();
+	}
+});
+
+test('ID token verification ignores non-signing keys with matching kid', async () => {
+	const { publicKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
+	const signingJwk = publicKey.export({ format: 'jwk' });
+	signingJwk.kid = 'signing-key';
+	signingJwk.use = 'sig';
+	signingJwk.alg = 'RS256';
+
+	const { oidc, restore } = loadOidcForIdToken({
+		header: { alg: 'RS256', kid: 'enc-key' },
+		keys: [
+			{ ...signingJwk, kid: 'enc-key', use: 'enc' },
+			signingJwk,
+		],
+	});
+	try {
+		await assert.rejects(
+			oidc.verifyIdToken({
+				jwksUri: 'https://auth.example.com/jwks/',
+				clientId: 'nodebb',
+				issuer: 'https://auth.example.com/application/o/nodebb/',
+			}, 'token', 'nonce-1'),
+			/Unable to find OIDC signing key/
 		);
 	} finally {
 		restore();
