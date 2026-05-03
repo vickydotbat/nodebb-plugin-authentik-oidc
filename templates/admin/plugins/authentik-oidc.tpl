@@ -63,7 +63,12 @@
 
 				<div class="mb-3">
 					<label class="form-label" for="jwksUri">JWKS URI</label>
-					<input class="form-control" id="jwksUri" type="url" data-authentik-field="jwksUri">
+					<div class="input-group">
+						<input class="form-control" id="jwksUri" type="url" data-authentik-field="jwksUri">
+						<button class="btn btn-outline-secondary" type="button" data-action="test-jwks">
+							<i class="fa fa-key"></i> Test JWKS
+						</button>
+					</div>
 					<div class="form-text text-danger" data-authentik-error="jwksUri"></div>
 				</div>
 
@@ -145,6 +150,7 @@
 					</table>
 				</div>
 				<pre class="border rounded p-3 bg-light text-body-secondary" data-authentik-last-failure>No failure diagnostics loaded.</pre>
+				<pre class="border rounded p-3 bg-light text-body-secondary" data-authentik-jwks-result>No JWKS test has run yet.</pre>
 			</section>
 		</div>
 	</div>

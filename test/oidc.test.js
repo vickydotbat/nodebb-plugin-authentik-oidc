@@ -23,6 +23,32 @@ function loadOidc() {
 	};
 }
 
+function loadOidcWithJwks(keys) {
+	const originalLoad = Module._load;
+	Module._load = function (request, parent, isMain) {
+		if (request === 'jsonwebtoken') {
+			return {};
+		}
+		if (request === './http' && parent && parent.filename.endsWith('/lib/oidc.js')) {
+			return {
+				async requestJson() {
+					return { keys };
+				},
+			};
+		}
+		return originalLoad.call(this, request, parent, isMain);
+	};
+	delete require.cache[require.resolve('../lib/oidc')];
+	const oidc = require('../lib/oidc');
+	return {
+		oidc,
+		restore() {
+			Module._load = originalLoad;
+			delete require.cache[require.resolve('../lib/oidc')];
+		},
+	};
+}
+
 function settings(overrides = {}) {
 	return {
 		authorizationEndpoint: 'https://auth.example.com/application/o/nodebb/authorize/',
@@ -63,6 +89,40 @@ test('authorization URL rejects attempts to override plugin-controlled parameter
 				{ nonce: 'nonce-1' }
 			),
 			/state is controlled by the plugin/
+		);
+	} finally {
+		restore();
+	}
+});
+
+test('JWKS test reports sanitized supported signing key metadata', async () => {
+	const { oidc, restore } = loadOidcWithJwks([
+		{ kty: 'RSA', use: 'sig', kid: 'rsa-1', alg: 'RS256', n: 'redacted', e: 'AQAB' },
+		{ kty: 'oct', use: 'enc', kid: 'enc-1' },
+		{ kty: 'EC', kid: 'ec-1', crv: 'P-256', x: 'redacted', y: 'redacted' },
+	]);
+	try {
+		const result = await oidc.testJwks('https://auth.example.com/jwks/');
+		assert.equal(result.keyCount, 3);
+		assert.equal(result.supportedSigningKeyCount, 2);
+		assert.deepEqual(result.keyTypes, ['EC', 'RSA']);
+		assert.deepEqual(result.algorithms, ['RS256']);
+		assert.equal(result.hasKeyIds, true);
+		assert.equal(JSON.stringify(result).includes('redacted'), false);
+	} finally {
+		restore();
+	}
+});
+
+test('JWKS test fails when no supported signing keys are available', async () => {
+	const { oidc, restore } = loadOidcWithJwks([
+		{ kty: 'oct', use: 'enc', kid: 'enc-1' },
+		{ kty: 'RSA', use: 'enc', kid: 'rsa-enc-1', alg: 'RS256' },
+	]);
+	try {
+		await assert.rejects(
+			oidc.testJwks('https://auth.example.com/jwks/'),
+			/JWKS did not include supported signing keys/
 		);
 	} finally {
 		restore();

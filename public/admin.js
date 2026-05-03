@@ -130,6 +130,17 @@ define('admin/plugins/authentik-oidc', ['alerts'], function (alerts) {
 		}, null, 2));
 	}
 
+	function renderJwksResult(result) {
+		$('[data-authentik-jwks-result]').text(JSON.stringify({
+			jwksUri: result.jwksUri,
+			keyCount: result.keyCount,
+			supportedSigningKeyCount: result.supportedSigningKeyCount,
+			keyTypes: result.keyTypes,
+			algorithms: result.algorithms,
+			hasKeyIds: result.hasKeyIds,
+		}, null, 2));
+	}
+
 	Admin.init = async function () {
 		fill(await get('/settings'));
 
@@ -148,6 +159,18 @@ define('admin/plugins/authentik-oidc', ['alerts'], function (alerts) {
 				alerts.success('OIDC discovery succeeded');
 			} catch (err) {
 				alerts.error(err.message || 'OIDC discovery failed');
+			}
+		});
+
+		$('[data-action="test-jwks"]').on('click', async function () {
+			showErrors({});
+			try {
+				renderJwksResult(await post('/jwks/test', {
+					jwksUri: $('[data-authentik-field="jwksUri"]').val(),
+				}));
+				alerts.success('JWKS test succeeded');
+			} catch (err) {
+				alerts.error(err.message || 'JWKS test failed');
 			}
 		});
 

@@ -12,7 +12,7 @@ Authentik-compatible OAuth2/OIDC SSO for NodeBB with strict verified-email ident
 - Keeps username display-only and never uses it for identity matching.
 - Provides an ACP settings page with issuer discovery, secret-preserving saves, authorization parameters, username collision policy, sanitized last-failure diagnostics, mapping audit, and stale mapping repair.
 
-Planned profile synchronization work is tracked in [Next steps](docs/NEXT_STEPS.md). Authentik profile data such as username, email, display name, and avatar should be synced only through explicit admin settings after identity resolution succeeds.
+Planned profile and role/group synchronization work is tracked in [Next steps](docs/NEXT_STEPS.md). Authentik profile data such as username, email, display name, avatar, groups, and roles should be synced only through explicit admin settings after identity resolution succeeds.
 
 Planned ACP improvements include grouped settings, sync toggles, authorization-parameter controls, broader diagnostics, and dry-run profile synchronization.
 

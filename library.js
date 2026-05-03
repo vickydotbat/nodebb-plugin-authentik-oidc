@@ -41,6 +41,13 @@ plugin.registerApiRoutes = async function ({ router, middleware }) {
 	);
 	routeHelpers.setupApiRoute(
 		router,
+		'post',
+		'/authentik-oidc/jwks/test',
+		adminMiddlewares,
+		admin.testJwks
+	);
+	routeHelpers.setupApiRoute(
+		router,
 		'get',
 		'/authentik-oidc/mappings/audit',
 		adminMiddlewares,

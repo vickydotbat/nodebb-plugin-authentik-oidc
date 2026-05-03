@@ -536,12 +536,27 @@ Manual integration tests should cover:
   - `syncFullname`
   - `syncAvatar`
   - explicit custom claim-to-user-field mappings
+- Add a role/group attachment synchronization subsystem:
+  - Configure mappings in ACP as table rows: NodeBB group, Authentik role/group identifier, sync direction, ownership/removal policy, priority, and enabled flag.
+  - Support Authentik to NodeBB reads from OIDC claims such as `groups`, `roles`, or a configured custom claim.
+  - Support NodeBB to Authentik writes only when an Authentik management API endpoint/token is configured; do not attempt remote role mutation through OIDC tokens.
+  - Allow one-way mappings by default. Bidirectional mappings must be opt-in and should require explicit admin confirmation because they can create loops or privilege escalation.
+  - Removal behavior must be configurable per mapping: add-only, remove when source membership disappears, or manual removal only.
+  - Apply role sync only after identity resolution by `sub`; never use username or email as authority for group/role changes.
+  - Run role sync as a separate post-login/scheduled sync step with dry-run support, not inside the identity-linking transaction.
+  - Store audit metadata: `authentikLastRoleSyncedAt`, mapping version, last source snapshot hash, and per-mapping status/errors where practical.
+  - Add an audit tool for drift: NodeBB group membership differs from mapped Authentik role/group state.
+  - Add guardrails for privileged mappings: NodeBB admin/moderator groups and Authentik administrative roles require confirmation and should be disabled by default.
 - Add conflict policies:
   - Email collision always fails closed.
   - Username collision can either reject, keep local username, or generate a unique username, depending on admin setting.
   - Avatar sync can skip invalid or missing `picture` claims without blocking login.
+- Add role/group conflict policies:
+  - If a role/group is mapped in both directions with different observed source state, use the configured owner or fail the mapping with an audit warning.
+  - If Authentik API writes fail, keep login successful by default but record sync failure and leave local identity mapping untouched.
+  - If a privileged mapping would grant more access than intended, fail closed and require admin review.
 - Store sync metadata such as `authentikLastSyncedAt`, `authentikLastEmail`, `authentikLastUsername`, and `authentikLastPicture`.
-- Add unit tests and live tests for email change, username change, username collision, missing `picture`, invalid avatar URL, valid avatar URL, local profile edits, and custom field mappings.
+- Add unit tests and live tests for email change, username change, username collision, missing `picture`, invalid avatar URL, valid avatar URL, local profile edits, custom field mappings, role/group add/remove behavior, bidirectional loop prevention, Authentik API failure, and privileged mapping confirmation.
 
 ### Phase 9: ACP Expansion And Operator UX
 
@@ -559,6 +574,7 @@ Manual integration tests should cover:
   - username collision policy
   - stale mapping cleanup policy
   - per-field synchronization toggles
+  - role/group attachment mappings
   - diagnostics mode
 - Add operator actions:
   - discover provider metadata
@@ -567,7 +583,7 @@ Manual integration tests should cover:
   - show sanitized last failure
   - audit identity mappings
   - repair stale mappings
-  - dry-run profile sync for a uid or `sub`
+  - dry-run profile and role/group sync for a uid or `sub`
 - Add frontend UX details:
   - inline field errors
   - loading states

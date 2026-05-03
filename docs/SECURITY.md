@@ -43,6 +43,16 @@ Synchronization rules should be explicit per field:
 - Custom field sync must use an allowlist of claim-to-field mappings. The plugin must not blindly copy all provider claims to NodeBB user fields.
 - Local edits may be overwritten only for fields where synchronization is explicitly enabled by the admin.
 
+Role/group attachment synchronization is higher risk than profile synchronization because it can grant access in both systems. It should be designed as an explicit mapping table, not automatic mirroring:
+
+- Each mapping must name the NodeBB group and Authentik role/group identifier explicitly.
+- Each mapping must declare its direction: Authentik to NodeBB, NodeBB to Authentik, or bidirectional.
+- Each mapping must declare ownership and removal behavior: add-only, remove when source membership disappears, or manual removal only.
+- NodeBB to Authentik writes require a dedicated Authentik management API token with the smallest practical scope. OIDC access tokens must not be treated as role-management authority unless the provider is deliberately configured for that and reviewed.
+- Bidirectional mappings must prevent loops. A change applied from Authentik during one sync pass must not be echoed back as a NodeBB-originated change in the same pass, and vice versa.
+- Privileged groups and roles require explicit admin confirmation and should be disabled by default. This includes NodeBB admin/moderator groups and Authentik administrative roles.
+- Role sync failures should not alter identity mappings. By default they should allow login to complete, record an audit warning, and leave access unchanged unless an admin marks a mapping as login-critical.
+
 The observed issue where newly-created Authentik users sometimes appeared with an existing NodeBB avatar should be treated as a profile-isolation bug until proven to be only Authentik/browser-session UI. New SSO account creation must update profile fields only on the resolved uid.
 
 ## User-Facing OIDC Controls
