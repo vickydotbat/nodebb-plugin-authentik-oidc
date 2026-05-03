@@ -77,6 +77,8 @@ The username collision policy defaults to creating a safe unique NodeBB username
 
 Optional Authentik self-service URLs can be configured in the ACP. When set, linked users see those external profile, password, MFA, and session-management links on `/user/<userslug>/authentik-oidc`.
 
+Closing sessions from Authentik's `auth` page does not currently terminate existing NodeBB sessions. Session revocation/back-channel logout support is planned; until then, Authentik session closure only affects future SSO reauthentication.
+
 ## Tests
 
 ```bash

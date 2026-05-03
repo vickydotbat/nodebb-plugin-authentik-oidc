@@ -59,6 +59,7 @@ Covered baseline cases:
 - Test optional authorization parameters such as `prompt=login` or `prompt=select_account` if Authentik session reuse causes account-selection confusion.
 - Configure Authentik self-service profile, password, MFA, and session URLs in the ACP and confirm `/user/<userslug>/authentik-oidc` shows only those external actions for the signed-in linked user.
 - Confirm the linked-account page does not display the OIDC `sub`, raw claims, tokens, or database mapping keys.
+- Confirm closing sessions from Authentik's `auth` page does not currently invalidate existing NodeBB sessions; keep this as the baseline for the upcoming session-revocation phase.
 
 ## Manual Observations
 
@@ -87,3 +88,4 @@ Covered baseline cases:
 - Investigate post-callback hang after successful login and confirm whether the callback response/redirect chain completes cleanly.
 - Add Authentik-side flow/policy rules to reject registration when username or email already exists in Authentik, and document that NodeBB can only enforce checks after OIDC claims return.
 - Live-test the linked-account profile page after rebuilding NodeBB and confirm the self-only profile menu route renders under the active theme.
+- Implement and live-test NodeBB session revocation after upstream Authentik logout/session closure.

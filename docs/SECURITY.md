@@ -74,3 +74,11 @@ Allowed user-facing controls should be limited to safe actions:
 Disconnect and refresh actions require CSRF protection and must resolve the linked account by stored `sub`. They must never accept a username, email, or arbitrary provider subject supplied by the browser as authority.
 
 Current implementation status: the user-facing page is read-only and supports only configured external Authentik self-service links. Refresh and disconnect actions remain deferred until they can enforce the stored `sub` during the OIDC round trip.
+
+## Session Revocation Boundary
+
+Closing or revoking sessions from Authentik's `auth` page does not currently terminate already-issued NodeBB sessions. NodeBB sessions remain valid until NodeBB logs them out, expires them, or the plugin implements explicit revocation.
+
+Planned revocation support must avoid storing access, refresh, or ID tokens. It should instead link each successful login to safe identifiers such as uid, OIDC `sub`, and, if available and validated, an OIDC session id claim. Back-channel or front-channel logout handlers must validate issuer, audience/client, signature or request authenticity, and subject/session mapping before destroying NodeBB sessions.
+
+Until that support exists, operators should treat Authentik session closure as preventing future SSO reauthentication only, not as a global NodeBB logout mechanism.
