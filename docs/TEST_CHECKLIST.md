@@ -28,3 +28,7 @@ Covered baseline cases:
 8. Test an Authentik user with unverified email and confirm login is rejected.
 9. Change the provider email after linking and confirm login still resolves by `sub`.
 10. Create a deliberate sub/email collision and confirm login fails closed with a warning log.
+
+## Manual Observations
+
+- 2026-05-03: In a browser already logged in as the existing NodeBB account `archvillainette`, starting Authentik login after verifying that account's email showed the existing account avatar before failing later in the OIDC callback. Keep this as a regression check: a verified-email match may link even when the Authentik username/display name differs, but it must not use username for identity and must still fail closed on issuer or `sub`/email conflicts.
