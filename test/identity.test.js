@@ -147,6 +147,21 @@ test('sub mapped to uid A but verified email belongs to uid B fails safely', asy
 	}
 });
 
+test('stale sub mapping to deleted user is removed and verified email can link', async () => {
+	const mocks = createMocks();
+	mocks.state.users.set(42, { uid: 42, username: 'archvillainette', email: 'person@example.com' });
+	mocks.state.emailToUid.set('person@example.com', 42);
+	mocks.state.subToUid.set('sub-1', 99);
+	const { identity, restore } = loadIdentity(mocks);
+	try {
+		const result = await identity.resolve(verified(), { issuer: 'https://id.example.com' });
+		assert.equal(result.uid, 42);
+		assert.equal(mocks.state.subToUid.get('sub-1'), 42);
+	} finally {
+		restore();
+	}
+});
+
 test('missing email fails safely', async () => {
 	const mocks = createMocks();
 	const { identity, restore } = loadIdentity(mocks);

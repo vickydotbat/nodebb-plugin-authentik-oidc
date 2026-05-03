@@ -106,6 +106,11 @@ function createMocks() {
 				state.subToUid.set(field, parseInt(value, 10));
 			}
 		},
+		async deleteObjectField(key, field) {
+			if (key === 'authentik:sub:uid') {
+				state.subToUid.delete(field);
+			}
+		},
 		async getSortedSetRange(key, start, stop) {
 			if (key === 'users:joindate') {
 				return [...state.users.keys()].slice(start, stop + 1);
