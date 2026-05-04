@@ -192,6 +192,23 @@ test('provider logout URL returns to the plugin login route', () => {
 	}
 });
 
+test('provider logout URL can use an Authentik flow with next return parameter', () => {
+	const { oidc, restore } = loadOidc();
+	try {
+		const url = new URL(oidc.providerLogoutUrl(
+			{
+				sessionClearEndpoint: 'https://auth.example.com/if/flow/default-invalidation-flow/',
+				sessionClearReturnParameter: 'next',
+			},
+			'https://forum.example.com/auth/authentik?authentikFreshLogin=1'
+		));
+		assert.equal(url.href.startsWith('https://auth.example.com/if/flow/default-invalidation-flow/'), true);
+		assert.equal(url.searchParams.get('next'), 'https://forum.example.com/auth/authentik?authentikFreshLogin=1');
+	} finally {
+		restore();
+	}
+});
+
 test('authorization URL does not override explicit provider prompt parameters', () => {
 	const { oidc, restore } = loadOidc();
 	try {

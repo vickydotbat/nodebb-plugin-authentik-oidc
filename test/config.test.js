@@ -105,7 +105,7 @@ test('fresh provider login setting defaults on and can be disabled', async () =>
 	}
 });
 
-test('clear provider session setting requires an end-session endpoint when enabled', async () => {
+test('clear provider session setting requires an end-session or custom clear endpoint when enabled', async () => {
 	const mocks = createMocks();
 	const { config, restore } = loadConfig(mocks);
 	try {
@@ -115,16 +115,18 @@ test('clear provider session setting requires an end-session endpoint when enabl
 				clearProviderSessionBeforeLogin: true,
 			})),
 			(err) => {
-				assert.equal(err.errors.endSessionEndpoint, 'Required');
+				assert.equal(err.errors.sessionClearEndpoint, 'Required when no end-session endpoint is configured');
 				return true;
 			}
 		);
 		const saved = await config.saveSettings(enabledSettings({
 			clearProviderSessionBeforeLogin: true,
-			endSessionEndpoint: 'https://auth.example.com/application/o/nodebb/end-session/',
+			sessionClearEndpoint: 'https://auth.example.com/if/flow/default-invalidation-flow/',
+			sessionClearReturnParameter: 'next',
 		}));
 		assert.equal(saved.clearProviderSessionBeforeLogin, true);
-		assert.equal(saved.endSessionEndpoint, 'https://auth.example.com/application/o/nodebb/end-session/');
+		assert.equal(saved.sessionClearEndpoint, 'https://auth.example.com/if/flow/default-invalidation-flow/');
+		assert.equal(saved.sessionClearReturnParameter, 'next');
 	} finally {
 		restore();
 	}

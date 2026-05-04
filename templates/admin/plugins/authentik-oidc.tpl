@@ -79,6 +79,22 @@
 				</div>
 
 				<div class="mb-3">
+					<label class="form-label" for="sessionClearEndpoint">Session clear endpoint override</label>
+					<input class="form-control" id="sessionClearEndpoint" type="url" placeholder="https://auth.example.com/if/flow/default-invalidation-flow/" data-authentik-field="sessionClearEndpoint">
+					<div class="form-text">Optional Authentik logout/invalidation flow URL to use instead of the OIDC end-session endpoint.</div>
+					<div class="form-text text-danger" data-authentik-error="sessionClearEndpoint"></div>
+				</div>
+
+				<div class="mb-3">
+					<label class="form-label" for="sessionClearReturnParameter">Session clear return parameter</label>
+					<select class="form-select" id="sessionClearReturnParameter" data-authentik-field="sessionClearReturnParameter">
+						<option value="post_logout_redirect_uri">post_logout_redirect_uri</option>
+						<option value="next">next</option>
+					</select>
+					<div class="form-text">Use <code>next</code> for Authentik flow URLs such as <code>/if/flow/default-invalidation-flow/</code>.</div>
+				</div>
+
+				<div class="mb-3">
 					<label class="form-label" for="scopes">Scopes</label>
 					<input class="form-control" id="scopes" type="text" data-authentik-field="scopes">
 					<div class="form-text text-danger" data-authentik-error="scopes"></div>
