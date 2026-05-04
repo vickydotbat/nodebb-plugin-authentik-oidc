@@ -192,7 +192,7 @@ This is the end-state roadmap for replacing NodeBB-native identity with Authenti
 - Authentik becomes the primary identity system for login, registration, logout, password changes, email changes, username/profile changes, MFA, consent, and session management.
 - NodeBB keeps local accounts and uids as application records, but identity operations are delegated to Authentik.
 - Existing NodeBB users can migrate without duplicate NodeBB accounts and without username-based takeover.
-- Local NodeBB login remains available as an emergency admin fallback until the migration is proven and an explicit ACP toggle disables it.
+- Local NodeBB login remains available only during migration or as an explicit break-glass path. The final security mode must be able to disable NodeBB-native login completely for normal users so Authentik-owned MFA cannot be bypassed.
 
 ### Feasibility Boundary
 
@@ -308,22 +308,29 @@ This is useful for users who can still log into NodeBB locally before SSO become
 
 - Add ACP section: "Identity ownership".
 - Add toggles:
-  - Show Authentik login button only
-  - Redirect `/login` to `/auth/authentik`
-  - Redirect `/register` to Authentik enrollment URL
-  - Disable NodeBB local registration
-  - Hide NodeBB local login form
-  - Keep emergency local admin login route enabled
-  - Require Authentik for non-admin users
+	- Show Authentik login button only
+	- Redirect `/login` to `/auth/authentik`
+	- Redirect `/register` to Authentik enrollment URL
+	- Disable NodeBB local registration
+	- Hide NodeBB local login form
+	- Disable NodeBB local login POST/API for normal users
+	- Disable NodeBB password reset/recovery flows for normal users
+	- Keep emergency local admin login route enabled
+	- Require Authentik for non-admin users
+- Security rationale: hiding the local login form is not enough. If Authentik owns MFA, local NodeBB username/password authentication must be blocked server-side, otherwise users can bypass MFA by posting directly to NodeBB login endpoints.
 - Implement with NodeBB hooks/routes where available:
-  - override login page rendering or redirect unauthenticated `/login`
-  - redirect `/register` and registration CTA links
-  - keep API/login behavior protected by policy, not only by hidden UI
+	- override login page rendering or redirect unauthenticated `/login`
+	- redirect `/register` and registration CTA links
+	- block local login POST/API behavior by policy, not only by hidden UI
+	- block local password reset and local password-change flows when Authentik manages passwords
 - Add emergency route such as `/login/local-admin`:
-  - disabled unless explicitly enabled
-  - admin-only after authentication
-  - rate-limited
-  - documented as break-glass access
+	- disabled unless explicitly enabled
+	- restricted to explicitly allowlisted admin uids or groups
+	- unavailable to normal users even if they know the URL
+	- rate-limited
+	- optionally restricted by IP allowlist or reverse-proxy auth
+	- logs every attempt and successful use as a security event
+	- documented as break-glass access
 
 #### B2. Logout Routing
 
@@ -385,18 +392,22 @@ This is useful for users who can still log into NodeBB locally before SSO become
 #### B5. ACP UX And Rollout Modes
 
 - Add rollout presets:
-  - Mixed mode: local login/register visible, Authentik available
-  - Migration mode: Authentik preferred, local login fallback visible
-  - SSO required: `/login` and `/register` redirect to Authentik, local fallback hidden
-  - SSO enforced: local login disabled except break-glass admin route
+	- Mixed mode: local login/register visible, Authentik available
+	- Migration mode: Authentik preferred, local login fallback visible
+	- SSO required: `/login` and `/register` redirect to Authentik, local fallback hidden, local login API still available only if explicitly allowed
+	- SSO enforced: NodeBB local login, registration, password reset, and password change are blocked for normal users
+	- SSO enforced plus break-glass: same as SSO enforced, with a tightly scoped emergency local admin route
+	- SSO enforced without break-glass: all NodeBB-native authentication is disabled; recovery requires server/database access or disabling the plugin out of band
 - Each preset should show exactly which toggles it changes.
 - Require typed confirmation before enabling SSO enforced mode.
 - Run preflight checks before allowing SSO enforced mode:
-  - at least one admin has linked Authentik
-  - back-channel logout configured or consciously skipped
-  - Authentik discovery/JWKS test passes
-  - redirect URI and logout URI match NodeBB public URL
-  - emergency admin fallback decision recorded
+	- at least one admin has linked Authentik
+	- at least one admin has working Authentik MFA
+	- back-channel logout configured or consciously skipped
+	- Authentik discovery/JWKS test passes
+	- redirect URI and logout URI match NodeBB public URL
+	- emergency admin fallback decision recorded
+	- admin confirms that NodeBB-native login bypasses Authentik MFA and will be blocked for normal users
 
 #### B6. Testing Plan
 
@@ -409,12 +420,16 @@ This is useful for users who can still log into NodeBB locally before SSO become
   - migration API failures do not change NodeBB mappings
   - migration cannot be replayed with a stale assertion
 - SSO replacement:
-  - `/login` redirects to Authentik when enabled
-  - `/register` redirects to Authentik enrollment when enabled
-  - emergency admin login remains reachable when configured
-  - local registration POST/API is blocked, not only hidden
-  - managed email/username/password edits are blocked server-side
-  - unmanaged profile preferences remain editable
+	- `/login` redirects to Authentik when enabled
+	- `/register` redirects to Authentik enrollment when enabled
+	- emergency admin login remains reachable when configured
+	- local login POST/API is rejected for normal users in SSO enforced mode
+	- local password reset/recovery is rejected for normal users in SSO enforced mode
+	- local password change is rejected when Authentik manages passwords
+	- local login cannot bypass Authentik MFA for normal users
+	- local registration POST/API is blocked, not only hidden
+	- managed email/username/password edits are blocked server-side
+	- unmanaged profile preferences remain editable
   - logout redirects to Authentik and clears NodeBB session
   - Authentik back-channel logout still revokes NodeBB sessions
 
