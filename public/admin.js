@@ -152,6 +152,23 @@ define('admin/plugins/authentik-oidc', ['alerts'], function (alerts) {
 		}, null, 2));
 	}
 
+	function renderLastAuthorization(result) {
+		if (!result || !result.at) {
+			$('[data-authentik-last-authorization]').text('No authorization-start diagnostics recorded.');
+			return;
+		}
+		$('[data-authentik-last-authorization]').text(JSON.stringify({
+			at: new Date(parseInt(result.at, 10)).toISOString(),
+			stage: result.stage,
+			clearProviderSessionBeforeLogin: result.clearProviderSessionBeforeLogin,
+			forceProviderLogin: result.forceProviderLogin,
+			hasEndSessionEndpoint: result.hasEndSessionEndpoint,
+			authorizationParameters: result.authorizationParameters,
+			redirectTarget: result.redirectTarget,
+			returnTo: result.returnTo,
+		}, null, 2));
+	}
+
 	function renderJwksResult(result) {
 		$('[data-authentik-jwks-result]').text(JSON.stringify({
 			jwksUri: result.jwksUri,
@@ -238,6 +255,15 @@ define('admin/plugins/authentik-oidc', ['alerts'], function (alerts) {
 				alerts.success('Loaded last logout diagnostics');
 			} catch (err) {
 				alerts.error(err.message || 'Failed to load logout diagnostics');
+			}
+		});
+
+		$('[data-action="show-last-authorization"]').on('click', async function () {
+			try {
+				renderLastAuthorization(await get('/diagnostics/last-authorization'));
+				alerts.success('Loaded last authorization diagnostics');
+			} catch (err) {
+				alerts.error(err.message || 'Failed to load authorization diagnostics');
 			}
 		});
 

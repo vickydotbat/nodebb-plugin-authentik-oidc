@@ -120,6 +120,7 @@ Troubleshooting:
 - 2026-05-03: Authentik user with no email was rejected by NodeBB with `OIDC email is required`; no NodeBB user was created.
 - 2026-05-03: Repeat login for linked `archvillainette` did not create a new NodeBB account. The browser appeared to hang after provider flows, but the NodeBB session was established successfully.
 - 2026-05-03: Normal NodeBB password login still works.
+- 2026-05-04: A test enrollment account whose email was not verified in time became locked out on the Authentik side. The account remained present as inactive, could not log in, could not complete email verification, and blocked re-registration with the same username because the username was already taken. Treat expired/unverified Authentik enrollment users as provider-side cleanup debt unless Authentik flow policy deletes, reactivates, or re-sends verification for them.
 
 ## Open Live Items
 
@@ -128,5 +129,6 @@ Troubleshooting:
 - Investigate Authentik account-selection/avatar behavior. Decide whether to add optional `prompt=login`, `prompt=select_account`, or an admin-configurable authorization parameter field.
 - Investigate post-callback hang after successful login and confirm whether the callback response/redirect chain completes cleanly.
 - Add Authentik-side flow/policy rules to reject registration when username or email already exists in Authentik, and verify they stop registration before Authentik redirects back to NodeBB.
+- Add an Authentik-side cleanup policy or admin runbook for inactive enrollment users whose email verification expires before completion, especially because they reserve usernames and may require manual deletion or recovery.
 - Live-test the linked-account profile page after rebuilding NodeBB and confirm the self-only profile menu route renders under the active theme.
 - Live-test NodeBB session revocation after upstream Authentik logout/session closure with Authentik back-channel logout enabled, including verification that Authentik POSTed a `logout_token` to NodeBB.

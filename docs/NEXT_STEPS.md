@@ -180,6 +180,7 @@ Remaining:
 
 - Configure Authentik enrollment flows to require email before account creation completes.
 - Configure Authentik policies to reject duplicate usernames and duplicate emails before redirecting back to NodeBB.
+- Add an Authentik cleanup/recovery policy for inactive users left behind by expired email verification during enrollment, since they can reserve usernames and block retry registration until manually deleted or recovered.
 - Confirm the Authentik provider maps the real email verification state into the OIDC `email_verified` claim.
 - Consider forcing account selection or fresh login for the NodeBB provider flow if browser sessions make the wrong Authentik account visually appear during registration.
 - Configure Authentik to emit only intended profile claims for NodeBB, including `preferred_username`, `name`, `email`, `email_verified`, and optionally `picture`.

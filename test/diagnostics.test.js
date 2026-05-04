@@ -47,3 +47,31 @@ test('last failure diagnostics store only sanitized claim metadata', async () =>
 		restore();
 	}
 });
+
+test('last authorization diagnostics sanitize outbound redirect URLs', async () => {
+	const mocks = createMocks();
+	const { diagnostics, restore } = loadDiagnostics(mocks);
+	try {
+		await diagnostics.recordAuthorizationStart({
+			stage: 'authorization',
+			clearProviderSessionBeforeLogin: true,
+			forceProviderLogin: true,
+			hasEndSessionEndpoint: true,
+			authorizationParameters: 'prompt=login',
+			redirectTarget: 'https://auth.example.com/application/o/authorize/?response_type=code&client_id=nodebb&redirect_uri=https%3A%2F%2Fforum.example.com%2Fauth%2Fauthentik%2Fcallback&scope=openid+email+profile&state=secret-state&nonce=secret-nonce&code_challenge=secret-challenge&code_challenge_method=S256&prompt=login&max_age=0',
+			returnTo: 'https://forum.example.com/auth/authentik?authentikFreshLogin=1',
+		});
+		const authorization = await diagnostics.getLastAuthorizationStart();
+		assert.equal(authorization.stage, 'authorization');
+		assert.equal(authorization.clearProviderSessionBeforeLogin, true);
+		assert.equal(authorization.forceProviderLogin, true);
+		assert.equal(authorization.hasEndSessionEndpoint, true);
+		assert.equal(authorization.redirectTarget.includes('prompt=login'), true);
+		assert.equal(authorization.redirectTarget.includes('max_age=0'), true);
+		assert.equal(authorization.redirectTarget.includes('secret-state'), false);
+		assert.equal(authorization.redirectTarget.includes('secret-nonce'), false);
+		assert.equal(authorization.redirectTarget.includes('secret-challenge'), false);
+	} finally {
+		restore();
+	}
+});

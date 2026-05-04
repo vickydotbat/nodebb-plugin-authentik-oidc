@@ -78,6 +78,13 @@ plugin.registerApiRoutes = async function ({ router, middleware }) {
 	);
 	routeHelpers.setupApiRoute(
 		router,
+		'get',
+		'/authentik-oidc/diagnostics/last-authorization',
+		adminMiddlewares,
+		admin.getLastAuthorizationStart
+	);
+	routeHelpers.setupApiRoute(
+		router,
 		'post',
 		'/authentik-oidc/mappings/repair-stale',
 		adminMiddlewares,

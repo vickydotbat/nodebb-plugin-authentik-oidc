@@ -52,6 +52,7 @@ Use Authentik enrollment and policy configuration to reject bad registrations be
 - Require whatever email-verification step your deployment treats as authoritative.
 - Reject duplicate email addresses in Authentik before the provider redirects back to NodeBB.
 - Reject duplicate usernames in Authentik when username uniqueness matters to operators or users.
+- Define what happens when email verification expires before completion. In testing, Authentik can leave an inactive user that cannot log in, cannot verify the expired email, and still reserves the username. Operators need either a recovery/re-send path or a cleanup policy/runbook for these stale enrollment users.
 - Avoid silently changing email, username, or profile fields during enrollment in ways the user cannot review.
 - Keep NodeBB as the relying party only; do not use the NodeBB plugin to collect old NodeBB passwords or create Authentik users through a generic browser form.
 
