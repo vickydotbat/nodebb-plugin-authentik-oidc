@@ -19,6 +19,7 @@ Covered baseline cases:
 - Stale mapping repair requires explicit confirmation and removes only mappings whose uid no longer exists.
 - Authorization parameters are appended to the provider redirect while plugin-controlled OIDC parameters cannot be overridden.
 - Username collision reject policy fails closed without creating a user or mapping.
+- Disabling new SSO account creation rejects brand-new verified users without creating a user or mapping, while verified-email linking to an existing account still works.
 - Last failure diagnostics store sanitized claim metadata without raw tokens or email addresses.
 - JWKS diagnostics report only sanitized signing-key metadata and fail when no supported signing key exists.
 - Authentik self-service URLs are trimmed, saved, and validated as optional HTTPS settings.
@@ -43,6 +44,8 @@ Covered baseline cases:
 8. Test an Authentik user with unverified email and confirm login is rejected.
 9. Change the provider email after linking and confirm login still resolves by `sub`.
 10. Create a deliberate sub/email collision and confirm login fails closed with a warning log.
+11. Disable new SSO account creation and confirm a brand-new verified Authentik user is rejected without a NodeBB user or mapping.
+12. With new SSO account creation still disabled, confirm an existing NodeBB account with the same verified email links successfully.
 
 ## Live Test Requirements
 

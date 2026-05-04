@@ -134,6 +134,12 @@
 					<div class="form-text">Configure this URL as Authentik's back-channel logout URI so Authentik session closure revokes NodeBB sessions.</div>
 				</div>
 
+				<div class="form-check form-switch mb-3">
+					<input class="form-check-input" type="checkbox" id="allowAccountCreation" data-authentik-field="allowAccountCreation">
+					<label class="form-check-label" for="allowAccountCreation">Allow new SSO account creation</label>
+					<div class="form-text">When disabled, only an existing linked subject or a verified email match can log in.</div>
+				</div>
+
 				<div class="mb-3">
 					<label class="form-label" for="backchannelLogoutUrl">Back-channel logout URL</label>
 					<div class="input-group">

@@ -10,6 +10,7 @@ Authentik-compatible OAuth2/OIDC SSO for NodeBB with strict verified-email ident
 - Rejects missing/unverified email for unlinked identities.
 - Rejects `sub`/email collisions instead of silently creating duplicate users.
 - Keeps username display-only and never uses it for identity matching.
+- Can run in link-only mode by disabling new SSO account creation while still allowing verified-email links to existing NodeBB users.
 - Provides an ACP settings page with issuer discovery, secret-preserving saves, authorization parameters, username collision policy, sanitized last-failure diagnostics, mapping audit, and stale mapping repair.
 - Provides a read-only user account page for linked Authentik/OIDC status and optional Authentik self-service links without exposing OIDC subjects or mapping keys.
 - Supports optional OIDC back-channel logout so Authentik session closure can revoke NodeBB sessions.
@@ -76,6 +77,8 @@ Use Last failure in the ACP diagnostics section when an OIDC callback is rejecte
 Provider URLs and self-service links must be HTTPS by default and cannot target localhost or private network addresses. The loopback HTTP exception is only for explicit local development.
 
 The username collision policy defaults to creating a safe unique NodeBB username for new SSO users. Set it to reject if new SSO account creation should fail when the provider's display username conflicts with an existing NodeBB username/userslug.
+
+Disable new SSO account creation when the forum should accept only users who already have a linked Authentik subject or an existing NodeBB account with the same verified email. This does not weaken verified-email linking; it only blocks brand-new NodeBB user creation.
 
 Optional Authentik self-service URLs can be configured in the ACP. When set, linked users see those external profile, password, MFA, and session-management links on `/user/<userslug>/authentik-oidc`.
 

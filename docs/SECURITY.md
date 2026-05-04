@@ -13,6 +13,8 @@ The plugin deliberately rejects logins when:
 
 The plugin never links or finds accounts by username. `preferred_username` and `name` are only used to seed the initial display username for newly created NodeBB users.
 
+Admins can disable new SSO account creation. In that mode, an existing `sub` mapping still logs in and a verified email can still link to an existing NodeBB user, but an otherwise new verified OIDC identity is rejected without creating a user or mapping.
+
 Secrets, authorization codes, access tokens, refresh tokens, and raw ID tokens must not be logged. Admin settings responses show only a placeholder when a client secret is saved.
 
 The ACP Last failure diagnostic stores only sanitized failure metadata: rejection code, stage, issuer metadata, claim presence flags, `email_verified` type/value, and whether userinfo contributed claims. It deliberately does not store raw tokens, authorization codes, full ID token/userinfo payloads, email addresses, or usernames.

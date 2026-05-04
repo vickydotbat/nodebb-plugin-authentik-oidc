@@ -60,6 +60,21 @@ test('back-channel logout setting saves and exposes computed URL', async () => {
 	}
 });
 
+test('account creation setting defaults on and can be disabled', async () => {
+	const mocks = createMocks();
+	const { config, restore } = loadConfig(mocks);
+	try {
+		assert.equal((await config.getSettings()).allowAccountCreation, true);
+		const saved = await config.saveSettings(enabledSettings({
+			allowAccountCreation: false,
+		}));
+		assert.equal(saved.allowAccountCreation, false);
+		assert.equal((await config.getSettings()).allowAccountCreation, false);
+	} finally {
+		restore();
+	}
+});
+
 test('invalid self-service URLs produce field-level validation errors', async () => {
 	const mocks = createMocks();
 	const { config, restore } = loadConfig(mocks);

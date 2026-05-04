@@ -102,7 +102,7 @@
 
 - Rework the ACP page into clear sections:
   - Provider connection: enabled, display name, issuer, discovery, endpoints, JWKS URI, client id, client secret, scopes, callback URL.
-  - Login behavior: authorization parameters, PKCE toggle, HTTPS development override, local login policy, registration/account creation policy.
+  - Login behavior: authorization parameters, PKCE toggle, HTTPS development override, local login policy, and the existing account creation policy.
   - Identity rules: verified-email requirement, username collision policy, email collision behavior, stale mapping cleanup behavior.
   - Synchronization: per-field sync toggles for email, username, fullname, avatar, custom claim mappings, and role/group attachment mappings.
   - Diagnostics and repair: test discovery, test provider connection, inspect sanitized last failure, audit mappings, repair stale mappings.
@@ -111,7 +111,7 @@
   - Use PKCE.
   - Allow insecure callback URL for local development only.
   - Force account selection/fresh Authentik login via preset authorization parameters.
-  - Allow new SSO account creation versus link existing accounts only.
+  - Account creation policy is implemented; improve its confirmation/field grouping in the ACP.
   - Username collision policy: generate unique, keep existing/local, or reject.
   - Sync toggles: email, username, display name, avatar, custom fields.
   - Role/group attachment table: NodeBB group, Authentik role/group, direction, ownership/removal policy, priority, and enabled flag.

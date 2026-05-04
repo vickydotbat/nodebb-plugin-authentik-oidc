@@ -175,6 +175,42 @@ test('username collision reject policy fails new SSO account creation', async ()
 	}
 });
 
+test('account creation disabled rejects new verified SSO user without mapping', async () => {
+	const mocks = createMocks();
+	const { identity, restore } = loadIdentity(mocks);
+	try {
+		await assert.rejects(
+			identity.resolve(
+				verified({ email: 'new@example.com' }),
+				{ issuer: 'https://id.example.com', allowAccountCreation: false }
+			),
+			/SSO account creation is disabled/
+		);
+		assert.equal(mocks.state.users.size, 0);
+		assert.equal(mocks.state.subToUid.size, 0);
+	} finally {
+		restore();
+	}
+});
+
+test('account creation disabled still links existing verified email', async () => {
+	const mocks = createMocks();
+	mocks.state.users.set(42, { uid: 42, username: 'local', email: 'person@example.com' });
+	mocks.state.emailToUid.set('person@example.com', 42);
+	const { identity, restore } = loadIdentity(mocks);
+	try {
+		const result = await identity.resolve(
+			verified(),
+			{ issuer: 'https://id.example.com', allowAccountCreation: false }
+		);
+		assert.equal(result.uid, 42);
+		assert.equal(mocks.state.users.size, 1);
+		assert.equal(mocks.state.subToUid.get('sub-1'), 42);
+	} finally {
+		restore();
+	}
+});
+
 test('email race during user creation links existing verified email without duplicate', async () => {
 	const mocks = createMocks();
 	let createdDuringRace = false;
