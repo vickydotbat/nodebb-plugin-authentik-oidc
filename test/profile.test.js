@@ -21,6 +21,7 @@ test('linked account state exposes safe user-facing metadata only', async () => 
 		authentikIssuer: 'https://auth.example.com/application/o/nodebb/',
 		authentikLinkedAt: 1710000000000,
 		authentikLastLoginAt: 1710000100000,
+		authentikLastSyncedAt: 1710000200000,
 		authentikLastEmail: 'linked@example.com',
 	});
 	const { profile, restore } = loadProfile(mocks);
@@ -31,6 +32,7 @@ test('linked account state exposes safe user-facing metadata only', async () => 
 			selfServicePasswordUrl: '',
 			selfServiceMfaUrl: 'https://auth.example.com/if/user/#/settings;page=mfa',
 			selfServiceSessionsUrl: '',
+			syncFullnameOnLogin: true,
 		});
 		assert.equal(state.linked, true);
 		assert.equal(state.providerName, 'Account Gate');
@@ -38,6 +40,8 @@ test('linked account state exposes safe user-facing metadata only', async () => 
 		assert.equal(state.lastProviderEmail, 'linked@example.com');
 		assert.equal(state.linkedAt, '2024-03-09T16:00:00.000Z');
 		assert.equal(state.lastLoginAt, '2024-03-09T16:01:40.000Z');
+		assert.equal(state.lastSyncedAt, '2024-03-09T16:03:20.000Z');
+		assert.deepEqual(state.managedFields, ['fullname']);
 		assert.equal(state.hasExternalLinks, true);
 		assert.deepEqual(state.externalLinks.map(link => link.id), ['profile', 'mfa']);
 		assert.equal(Object.prototype.hasOwnProperty.call(state, 'sub'), false);

@@ -75,6 +75,21 @@ test('account creation setting defaults on and can be disabled', async () => {
 	}
 });
 
+test('profile sync setting defaults off and can be enabled', async () => {
+	const mocks = createMocks();
+	const { config, restore } = loadConfig(mocks);
+	try {
+		assert.equal((await config.getSettings()).syncFullnameOnLogin, false);
+		const saved = await config.saveSettings(enabledSettings({
+			syncFullnameOnLogin: true,
+		}));
+		assert.equal(saved.syncFullnameOnLogin, true);
+		assert.equal((await config.getSettings()).syncFullnameOnLogin, true);
+	} finally {
+		restore();
+	}
+});
+
 test('invalid self-service URLs produce field-level validation errors', async () => {
 	const mocks = createMocks();
 	const { config, restore } = loadConfig(mocks);

@@ -129,7 +129,8 @@ plugin.whitelistUserFields = async function (payload) {
 		'authentikIssuer',
 		'authentikLinkedAt',
 		'authentikLastLoginAt',
-		'authentikLastEmail'
+		'authentikLastEmail',
+		'authentikLastSyncedAt'
 	);
 	return payload;
 };

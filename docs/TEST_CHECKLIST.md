@@ -15,6 +15,7 @@ Covered baseline cases:
 - `sub` mapped to uid A but email belongs to uid B rejects.
 - Missing email rejects.
 - String `"true"` for `email_verified` rejects.
+- Optional display name sync updates `fullname` only after successful identity resolution and does not blank it when `name` is missing.
 - Mapping audit reports healthy, stale, missing reverse, conflicting reverse, and duplicate user-side subject links.
 - Stale mapping repair requires explicit confirmation and removes only mappings whose uid no longer exists.
 - Authorization parameters are appended to the provider redirect while plugin-controlled OIDC parameters cannot be overridden.

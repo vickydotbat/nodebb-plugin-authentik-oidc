@@ -140,6 +140,12 @@
 					<div class="form-text">When disabled, only an existing linked subject or a verified email match can log in.</div>
 				</div>
 
+				<div class="form-check form-switch mb-3">
+					<input class="form-check-input" type="checkbox" id="syncFullnameOnLogin" data-authentik-field="syncFullnameOnLogin">
+					<label class="form-check-label" for="syncFullnameOnLogin">Sync display name from OIDC name claim</label>
+					<div class="form-text">When enabled, successful SSO logins update NodeBB fullname from the provider after identity resolution succeeds.</div>
+				</div>
+
 				<div class="mb-3">
 					<label class="form-label" for="backchannelLogoutUrl">Back-channel logout URL</label>
 					<div class="input-group">

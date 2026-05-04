@@ -30,8 +30,8 @@
 
 ### P3: Profile Synchronization
 
-- Add explicit per-field Authentik-to-NodeBB synchronization after identity resolution.
-- Keep sync disabled by default or limited to low-risk fields until diagnostics and conflict policies are solid.
+- Added opt-in display name synchronization from OIDC `name` to NodeBB `fullname` after identity resolution.
+- Keep further sync disabled by default or limited to low-risk fields until diagnostics and conflict policies are solid.
 - Treat email sync and username sync as higher-risk than display name/avatar sync because they affect account recovery, mentions, and user recognition.
 
 ### P4: Authentik-Side Enrollment Polish
@@ -78,7 +78,7 @@
 - Add admin settings for Authentik-as-source-of-truth synchronization:
   - Email sync: update NodeBB email only when provider `email_verified === true`.
   - Username sync: update NodeBB username from `preferred_username` only if enabled and conflict policy passes.
-  - Display name sync: update fullname from `name`.
+  - Display name sync: implemented as an opt-in update from `name` to `fullname` after identity resolution.
   - Avatar sync: update NodeBB avatar from OIDC `picture` only if enabled and URL passes validation.
   - Custom field sync: map explicit OIDC claim names to NodeBB user fields.
 - Add role/group attachment synchronization as a separate, explicit subsystem:
@@ -92,7 +92,7 @@
   - Store per-user role sync audit fields such as `authentikLastRoleSyncedAt`, last applied mapping version, and last role sync status.
   - Prevent sync loops with source-of-truth ownership, mapping versions, and a "do not echo remote changes back" rule for the same sync pass.
   - Treat privileged groups as high-risk: require explicit confirmation before mappings affect admin/moderator or Authentik administrative roles.
-- Store sync audit fields on each user: `authentikLastSyncedAt`, `authentikLastEmail`, `authentikLastUsername`, and per-field sync status when practical.
+- Store sync audit fields on each user: `authentikLastSyncedAt` is implemented for display name sync; add `authentikLastUsername` and per-field sync status when practical.
 - Make synchronization happen after identity resolution by `sub`, never before identity resolution.
 - Treat synchronization failures as field-level warnings by default, not login failures, except for email conflicts or identity-critical fields.
 - Add dry-run diagnostics in ACP showing what profile fields and role/group attachments would change for a selected uid/sub without applying writes.
@@ -113,7 +113,7 @@
   - Force account selection/fresh Authentik login via preset authorization parameters.
   - Account creation policy is implemented; improve its confirmation/field grouping in the ACP.
   - Username collision policy: generate unique, keep existing/local, or reject.
-  - Sync toggles: email, username, display name, avatar, custom fields.
+  - Sync toggles: display name is implemented; email, username, avatar, and custom fields remain deferred.
   - Role/group attachment table: NodeBB group, Authentik role/group, direction, ownership/removal policy, priority, and enabled flag.
   - Avatar behavior: disabled, use provider `picture`, preserve local, or reset to NodeBB default.
   - Diagnostics mode with short retention.
@@ -154,7 +154,7 @@ Implemented:
 
 Remaining:
 
-- Add last sync time once profile synchronization exists.
+- Last sync time is shown when display name synchronization runs.
 - Show whether the current NodeBB email is provider-verified once email sync policy exists.
 - Add user-facing NodeBB controls where safe:
   - Re-run Authentik login to refresh/sync profile data.

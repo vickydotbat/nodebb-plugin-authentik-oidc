@@ -26,6 +26,9 @@
 				<dt class="col-sm-4">Last login</dt>
 				<dd class="col-sm-8">{{{ if authentikOidc.lastLoginAt }}}{authentikOidc.lastLoginAt}{{{ else }}}Unknown{{{ end }}}</dd>
 
+				<dt class="col-sm-4">Last sync</dt>
+				<dd class="col-sm-8">{{{ if authentikOidc.lastSyncedAt }}}{authentikOidc.lastSyncedAt}{{{ else }}}Not synced{{{ end }}}</dd>
+
 				<dt class="col-sm-4">Last provider email</dt>
 				<dd class="col-sm-8">{{{ if authentikOidc.lastProviderEmail }}}{authentikOidc.lastProviderEmail}{{{ else }}}Unknown{{{ end }}}</dd>
 			</dl>
@@ -33,7 +36,15 @@
 
 		<section class="border rounded p-3">
 			<h3 class="fs-5 fw-semibold mb-3">Managed fields</h3>
+			{{{ if authentikOidc.managedFields.length }}}
+			<ul class="list-unstyled mb-0">
+				{{{ each authentikOidc.managedFields }}}
+				<li><span class="badge text-bg-secondary">{./}</span></li>
+				{{{ end }}}
+			</ul>
+			{{{ else }}}
 			<p class="text-muted mb-0">No profile synchronization fields are enabled.</p>
+			{{{ end }}}
 		</section>
 
 		{{{ if authentikOidc.hasExternalLinks }}}

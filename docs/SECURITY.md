@@ -21,6 +21,8 @@ The ACP Last failure diagnostic stores only sanitized failure metadata: rejectio
 
 The user-facing linked-account page deliberately does not expose the OIDC `sub`, reverse mapping keys, raw claims, tokens, or authorization artifacts. It shows only linked status, provider display name, issuer, timestamps, the last provider email seen by the plugin, and configured external self-service links.
 
+Display name synchronization, when enabled, runs only after identity resolution has succeeded by `sub` or verified email. The provider `name` claim is not used for identity and missing names do not erase the local `fullname`.
+
 Admin-triggered provider discovery, JWKS diagnostics, provider endpoints, and self-service links are restricted to HTTPS URLs by default and reject localhost or private network targets. Loopback HTTP is allowed only when the explicit development override is enabled. This reduces SSRF risk from ACP diagnostics and prevents unsafe links from being rendered to users.
 
 ## Provider Boundary
