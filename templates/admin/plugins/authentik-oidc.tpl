@@ -180,6 +180,9 @@
 						<button type="button" class="btn btn-outline-secondary" data-action="show-last-failure">
 							<i class="fa fa-circle-exclamation"></i> Last failure
 						</button>
+						<button type="button" class="btn btn-outline-secondary" data-action="show-last-logout">
+							<i class="fa fa-right-from-bracket"></i> Last logout
+						</button>
 						<button type="button" class="btn btn-outline-danger" data-action="repair-stale-mappings" disabled>
 							<i class="fa fa-trash"></i> Repair stale
 						</button>
@@ -203,6 +206,7 @@
 					</table>
 				</div>
 				<pre class="border rounded p-3 bg-light text-body-secondary" data-authentik-last-failure>No failure diagnostics loaded.</pre>
+				<pre class="border rounded p-3 bg-light text-body-secondary" data-authentik-last-logout>No back-channel logout request recorded.</pre>
 				<pre class="border rounded p-3 bg-light text-body-secondary" data-authentik-jwks-result>No JWKS test has run yet.</pre>
 			</section>
 		</div>

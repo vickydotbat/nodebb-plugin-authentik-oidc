@@ -130,6 +130,28 @@ define('admin/plugins/authentik-oidc', ['alerts'], function (alerts) {
 		}, null, 2));
 	}
 
+	function renderLastLogout(result) {
+		if (!result || !result.at) {
+			$('[data-authentik-last-logout]').text('No back-channel logout request recorded.');
+			return;
+		}
+		$('[data-authentik-last-logout]').text(JSON.stringify({
+			at: new Date(parseInt(result.at, 10)).toISOString(),
+			stage: result.stage,
+			outcome: result.outcome,
+			enabled: result.enabled,
+			hasLogoutToken: result.hasLogoutToken,
+			tokenValidated: result.tokenValidated,
+			hasSub: result.hasSub,
+			hasSid: result.hasSid,
+			uid: result.uid,
+			source: result.source,
+			code: result.code,
+			message: result.message,
+			statusCode: result.statusCode,
+		}, null, 2));
+	}
+
 	function renderJwksResult(result) {
 		$('[data-authentik-jwks-result]').text(JSON.stringify({
 			jwksUri: result.jwksUri,
@@ -207,6 +229,15 @@ define('admin/plugins/authentik-oidc', ['alerts'], function (alerts) {
 				alerts.success('Loaded last failure diagnostics');
 			} catch (err) {
 				alerts.error(err.message || 'Failed to load diagnostics');
+			}
+		});
+
+		$('[data-action="show-last-logout"]').on('click', async function () {
+			try {
+				renderLastLogout(await get('/diagnostics/last-logout'));
+				alerts.success('Loaded last logout diagnostics');
+			} catch (err) {
+				alerts.error(err.message || 'Failed to load logout diagnostics');
 			}
 		});
 

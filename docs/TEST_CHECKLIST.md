@@ -32,6 +32,8 @@ Covered baseline cases:
 - Back-channel logout setting saves and exposes a computed logout URL.
 - OIDC logout token validation requires the back-channel logout event and rejects nonce.
 - Back-channel logout revokes NodeBB sessions for mapped `sub` or stored `sid` only when enabled.
+- Back-channel logout accepts Authentik-style form-encoded `logout_token` request bodies.
+- Back-channel logout diagnostics record sanitized `revoked` and `unmatched` outcomes without storing raw logout tokens.
 
 ## Manual Authentik Integration
 
@@ -47,6 +49,36 @@ Covered baseline cases:
 10. Create a deliberate sub/email collision and confirm login fails closed with a warning log.
 11. Disable new SSO account creation and confirm a brand-new verified Authentik user is rejected without a NodeBB user or mapping.
 12. With new SSO account creation still disabled, confirm an existing NodeBB account with the same verified email links successfully.
+
+## Manual Back-Channel Logout
+
+Back-channel logout requires configuration in both systems. The NodeBB ACP toggle only tells the plugin to accept and process logout tokens; it does not make Authentik send them.
+
+1. Rebuild and restart NodeBB after installing the plugin version that contains `/auth/authentik/backchannel-logout`.
+2. In NodeBB ACP, enable OIDC back-channel logout and save settings.
+3. Copy the displayed back-channel logout URL.
+4. In the Authentik OAuth2/OIDC provider used by NodeBB, set the provider's back-channel logout URI to that exact URL.
+5. In the same Authentik provider, set Logout Method to Back-channel and save the provider.
+6. Confirm the URL is publicly reachable by Authentik over HTTPS and is not blocked by a reverse proxy, firewall, Cloudflare rule, or private-network routing.
+7. Confirm the Authentik version supports OIDC back-channel logout and Single Logout for OAuth2/OIDC providers.
+8. Confirm the NodeBB application login is using this exact Authentik provider, not another provider with a similar name.
+9. Confirm the NodeBB OIDC settings include the same issuer and JWKS URI used to validate login ID tokens.
+10. Log out of NodeBB and log back in through Authentik so Authentik creates a fresh active OIDC provider session and the plugin stores the current OIDC `sub` and, when emitted, `sid` mapping.
+11. Terminate the Authentik user session. Prefer an actual user logout through Authentik's logout flow first, then test administrative session deletion. Revoking consent for the NodeBB application is not sufficient by itself.
+12. Confirm Authentik sends a POST request containing `logout_token` to `/auth/authentik/backchannel-logout`.
+13. Confirm NodeBB responds `204` and logs `revoked NodeBB sessions from OIDC back-channel logout`.
+14. In the NodeBB plugin ACP, click Last logout and record the sanitized outcome.
+15. Refresh the existing NodeBB browser tab and confirm the user is no longer authenticated.
+16. If NodeBB still shows the user as logged in, check whether the browser page is only displaying cached content by navigating to a protected action or reloading with cache disabled.
+
+Troubleshooting:
+
+- No request reaches NodeBB: the Authentik provider is missing the back-channel logout URI, Authentik was not restarted/saved, or the NodeBB URL is unreachable from Authentik.
+- NodeBB returns `400`: inspect NodeBB logs for logout-token validation failure, issuer/audience mismatch, missing JWKS URI, unsupported signing key, missing back-channel logout event, or invalid nonce.
+- NodeBB returns `204` but no revocation happens: the logout token `sub` or `sid` did not match a stored NodeBB mapping. Re-login through NodeBB SSO and retry.
+- NodeBB logs revocation but the browser appears logged in: refresh the page, try a protected action, and confirm NodeBB's session store actually removed the session for the uid.
+- ACP Last logout shows no record: Authentik did not call the plugin route at all.
+- ACP Last logout shows `unmatched`: Authentik called the plugin with a valid token, but the token did not map to the linked NodeBB user.
 
 ## Live Test Requirements
 
@@ -66,7 +98,7 @@ Covered baseline cases:
 - Test optional authorization parameters such as `prompt=login` or `prompt=select_account` if Authentik session reuse causes account-selection confusion.
 - Configure Authentik self-service profile, password, MFA, and session URLs in the ACP and confirm `/user/<userslug>/authentik-oidc` shows only those external actions for the signed-in linked user.
 - Confirm the linked-account page does not display the OIDC `sub`, raw claims, tokens, or database mapping keys.
-- Enable OIDC back-channel logout in the plugin ACP, configure the displayed back-channel logout URL in Authentik, close the Authentik session from the `auth` page, and confirm the linked NodeBB session is revoked.
+- Complete the Manual Back-Channel Logout section above and record whether Authentik sent the logout token, how NodeBB responded, and whether the existing browser session was actually revoked.
 
 ## Manual Observations
 
@@ -95,4 +127,4 @@ Covered baseline cases:
 - Investigate post-callback hang after successful login and confirm whether the callback response/redirect chain completes cleanly.
 - Add Authentik-side flow/policy rules to reject registration when username or email already exists in Authentik, and document that NodeBB can only enforce checks after OIDC claims return.
 - Live-test the linked-account profile page after rebuilding NodeBB and confirm the self-only profile menu route renders under the active theme.
-- Live-test NodeBB session revocation after upstream Authentik logout/session closure with Authentik back-channel logout enabled.
+- Live-test NodeBB session revocation after upstream Authentik logout/session closure with Authentik back-channel logout enabled, including verification that Authentik POSTed a `logout_token` to NodeBB.

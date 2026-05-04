@@ -83,7 +83,16 @@ Disable new SSO account creation when the forum should accept only users who alr
 
 Optional Authentik self-service URLs can be configured in the ACP. When set, linked users see those external profile, password, MFA, and session-management links on `/user/<userslug>/authentik-oidc`.
 
-Closing sessions from Authentik's `auth` page requires Authentik single logout to be configured. Enable OIDC back-channel logout in this plugin's ACP page, configure the displayed back-channel logout URL in Authentik, and ensure Authentik can reach the NodeBB public URL. The plugin validates the signed logout token and revokes NodeBB sessions for the linked `sub` or stored OIDC `sid`.
+Closing sessions from Authentik requires Authentik Single Logout to be configured. Enable OIDC back-channel logout in this plugin's ACP page, configure the displayed back-channel logout URL as the Authentik provider's Logout URI, set Logout Method to Back-channel, and ensure Authentik can reach the NodeBB public URL. The plugin validates the signed logout token and revokes NodeBB sessions for the linked `sub` or stored OIDC `sid`.
+
+Back-channel logout is triggered only when Authentik terminates the user session and identifies an active OIDC provider session for NodeBB. Revoking consent for the NodeBB application is not a logout signal by itself. If deleting an Authentik session does not log the user out of NodeBB, open the plugin ACP diagnostics and click Last logout:
+
+- No record: Authentik did not POST to NodeBB, or the request did not reach NodeBB.
+- `outcome: rejected`: Authentik called NodeBB, but logout-token validation failed. Check issuer, client id/audience, JWKS URI, and signing key support.
+- `outcome: unmatched`: the logout token was valid, but its `sub`/`sid` did not match a stored NodeBB mapping. Log into NodeBB through Authentik again, then retry.
+- `outcome: revoked`: NodeBB revoked all sessions for the mapped uid. Refresh the browser or try a protected action to confirm the old session is gone.
+
+After changing Authentik logout settings, log out of NodeBB and log back in through Authentik once so Authentik and the plugin both have a fresh provider-session record.
 
 Display name synchronization is disabled by default. When enabled, successful SSO logins update NodeBB `fullname` from the provider's OIDC `name` claim after the account has already been resolved by `sub` or verified email. Missing `name` claims do not blank the local field.
 

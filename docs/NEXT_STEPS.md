@@ -16,7 +16,8 @@
 - Add mapping audit and stale mapping repair.
 - Add configurable authorization parameters for Authentik account selection or fresh login.
 - Add admin-selectable username collision behavior.
-- Add NodeBB session revocation support for upstream Authentik logout/session closure. Closing sessions from Authentik's `auth` page does not currently invalidate existing NodeBB sessions.
+- Add NodeBB session revocation support for upstream Authentik logout/session closure.
+- Added sanitized ACP diagnostics for the last back-channel logout request so operators can tell whether Authentik called NodeBB, whether the logout token validated, and whether `sub`/`sid` matched a NodeBB mapping.
 - Keep repair and diagnostics conservative: explicit confirmation for destructive actions, short retention, and sanitized output only.
 
 ### P2: NodeBB User Profile Controls
@@ -50,12 +51,11 @@
 
 - Security audit tightened outbound URL validation, JWKS signing-key selection, unsafe self-service link filtering, missing-state handling, and provider error callbacks.
 - Expand sanitized diagnostics if live failures need more context. Current ACP diagnostics include rejection code, claim presence, `email_verified` type/value, issuer metadata, and whether userinfo was used; raw tokens and full claims are not stored.
-- Design logout/session-revocation behavior:
+- Logout/session-revocation follow-up:
+  - Live-test Authentik back-channel logout with ACP Last logout diagnostics after rebuilding NodeBB.
+  - Confirm Authentik sends a POST with `logout_token` for user logout and administrative session deletion.
   - Support OIDC RP-initiated logout from NodeBB to Authentik where practical.
-  - Investigate Authentik front-channel or back-channel logout events and whether current NodeBB exposes a safe API to destroy all sessions for a uid.
-  - Store enough per-login session linkage to map an Authentik `sub` or `sid` claim to active NodeBB sessions without storing tokens.
-  - Add an ACP action to revoke all NodeBB sessions for a linked uid/sub.
-  - Treat upstream Authentik session closure as not sufficient for NodeBB logout until this is implemented and live-tested.
+  - Add an ACP action to revoke all NodeBB sessions for a linked uid/sub if live operations need manual intervention.
 - Live-test admin-configurable authorization parameters for Authentik flows, especially `prompt=login` or `prompt=select_account`, to reduce accidental reuse of an existing Authentik browser session.
 - Decide which username-collision policy to recommend for first release:
   - `unique`: create a safe unique NodeBB username for new SSO users.
