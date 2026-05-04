@@ -183,6 +183,241 @@ Remaining:
 - Configure Authentik to emit only intended profile claims for NodeBB, including `preferred_username`, `name`, `email`, `email_verified`, and optionally `picture`.
 - Decide whether Authentik should prevent profile changes locally in NodeBB by policy, UI messaging, or future plugin settings.
 
+## Final Roadmap: Authentik As Source Of Truth
+
+This is the end-state roadmap for replacing NodeBB-native identity with Authentik while still preserving safe migration for existing NodeBB accounts.
+
+### Goal
+
+- Authentik becomes the primary identity system for login, registration, logout, password changes, email changes, username/profile changes, MFA, consent, and session management.
+- NodeBB keeps local accounts and uids as application records, but identity operations are delegated to Authentik.
+- Existing NodeBB users can migrate without duplicate NodeBB accounts and without username-based takeover.
+- Local NodeBB login remains available as an emergency admin fallback until the migration is proven and an explicit ACP toggle disables it.
+
+### Feasibility Boundary
+
+Just-in-time migration from a NodeBB username/password into Authentik is not possible through OIDC alone. OIDC starts after Authentik has authenticated the user, so the NodeBB plugin does not receive the user's old NodeBB password during the Authentik login flow.
+
+The safe options are:
+
+1. Recommended: bulk pre-provision Authentik users from NodeBB data, then link on first OIDC login by verified email or a controlled migration identifier.
+2. Possible with more work: create an Authentik-side migration flow/source that validates old NodeBB credentials against a narrowly scoped NodeBB migration endpoint, then creates the Authentik user inside Authentik.
+3. Possible but higher risk: let the NodeBB plugin expose a one-time authenticated migration wizard for already logged-in NodeBB users that creates an Authentik account through the Authentik API and immediately links it.
+
+The plugin must not implement a generic form that collects NodeBB passwords and blindly creates Authentik accounts without rate limits, audit logs, CSRF protection, and replay protection.
+
+### Track A: Existing Account Migration
+
+#### A1. Data Inventory
+
+- Add an ACP migration audit page:
+  - total NodeBB users
+  - users already linked to Authentik
+  - users with confirmed email
+  - users without email
+  - users with duplicate email
+  - users with unconfirmed email
+  - users with local password credentials
+  - privileged users: admins, global moderators, category moderators
+- Add CSV/JSON export for migration planning without password hashes by default.
+- Add an optional dry-run report that checks whether each NodeBB email already exists in Authentik, using a least-privilege Authentik API token.
+
+#### A2. Authentik Management API Integration
+
+- Add ACP settings for Authentik admin API access:
+  - base URL
+  - API token
+  - default group for migrated users
+  - default active/inactive state
+  - whether migrated users must reset password before first login
+  - whether email should be marked verified only when NodeBB email is confirmed
+- Store the API token as a secret and never return it in ACP JSON.
+- Add "Test Authentik API" diagnostics that verifies token scope without exposing the token.
+- Use the Authentik API only for migration and profile-management actions, never for OIDC login identity decisions.
+
+#### A3. Recommended Bulk Pre-Provision Mode
+
+- Add dry-run pre-provision:
+  - match NodeBB users to Authentik users by normalized verified email only
+  - flag duplicate emails on either side
+  - flag username conflicts separately from identity matching
+  - flag missing/unverified email users as not eligible
+- Add execute pre-provision:
+  - create Authentik users for eligible NodeBB accounts that do not already exist
+  - set username from NodeBB username after Authentik-safe normalization
+  - set email from NodeBB confirmed email
+  - assign migration group
+  - require password reset or send enrollment/recovery link rather than copying password hashes
+  - write a pending migration marker on NodeBB: `user:<uid>.authentikMigrationPending = true`
+- On first successful OIDC login:
+  - resolve by `sub` if already linked
+  - otherwise link by verified email to the existing NodeBB uid
+  - clear `authentikMigrationPending`
+  - record `authentikMigratedAt`
+
+#### A4. Authentik-Side Just-In-Time Migration Mode
+
+This is possible only if Authentik runs the old-credential check before OIDC completes.
+
+- Create a dedicated Authentik enrollment/authentication flow for "Migrate NodeBB account":
+  - identification stage for username/email
+  - password stage or custom source/backend that validates against NodeBB
+  - email verification stage when needed
+  - user write stage to create/update the Authentik user
+  - user login stage to attach the Authentik session
+- Add a NodeBB migration verification endpoint only if needed by that Authentik flow:
+  - accepts username/email + password over HTTPS only
+  - rate-limited and logged
+  - validates against NodeBB's existing password verifier
+  - returns only a signed short-lived migration assertion, not user data or password hashes
+  - disables itself after migration window closes
+- Authentik consumes the migration assertion and creates the Authentik user.
+- NodeBB receives normal OIDC claims and links by verified email or a migration claim.
+- Do not let a NodeBB username alone become authority. Require either verified email continuity or a signed migration assertion tied to the exact uid.
+
+#### A5. NodeBB-Side Self-Service Migration Wizard
+
+This is useful for users who can still log into NodeBB locally before SSO becomes mandatory.
+
+- Add ACP toggle: "Allow logged-in users to create/link Authentik account".
+- Add `/user/<slug>/authentik-oidc/migrate` for self only.
+- Require current NodeBB password re-authentication for local accounts before migration.
+- Let the user choose:
+  - create Authentik account with current confirmed NodeBB email
+  - link to existing Authentik account by starting OIDC login
+  - send Authentik enrollment/recovery email
+- Create or invite the Authentik user through the Authentik API.
+- Force first Authentik login before writing the permanent `sub` mapping.
+- Log all migration attempts with uid, status, and reason, but no passwords or tokens.
+
+#### A6. Migration Guardrails
+
+- Do not migrate users with missing email until they add and verify one.
+- Do not auto-migrate duplicate emails.
+- Do not auto-migrate privileged users without explicit admin confirmation.
+- Do not copy NodeBB password hashes into Authentik unless a reviewed Authentik-compatible import path exists and the algorithm mapping is explicitly tested.
+- Keep a rollback path:
+  - local login fallback for admins
+  - ability to disable forced SSO
+  - ability to unlink an Authentik mapping only when a safe fallback login exists
+  - migration audit export before and after writes
+
+### Track B: ACP Levers To Replace NodeBB Identity UI
+
+#### B1. Login And Registration Routing
+
+- Add ACP section: "Identity ownership".
+- Add toggles:
+  - Show Authentik login button only
+  - Redirect `/login` to `/auth/authentik`
+  - Redirect `/register` to Authentik enrollment URL
+  - Disable NodeBB local registration
+  - Hide NodeBB local login form
+  - Keep emergency local admin login route enabled
+  - Require Authentik for non-admin users
+- Implement with NodeBB hooks/routes where available:
+  - override login page rendering or redirect unauthenticated `/login`
+  - redirect `/register` and registration CTA links
+  - keep API/login behavior protected by policy, not only by hidden UI
+- Add emergency route such as `/login/local-admin`:
+  - disabled unless explicitly enabled
+  - admin-only after authentication
+  - rate-limited
+  - documented as break-glass access
+
+#### B2. Logout Routing
+
+- Add ACP setting: "NodeBB logout behavior".
+- Modes:
+  - NodeBB only: current local logout behavior
+  - Authentik application logout: redirect to provider end-session URL
+  - Full Authentik logout: redirect to a configured Authentik invalidation flow that logs out all apps
+- Implement RP-initiated logout:
+  - discover/use `end_session_endpoint` when available
+  - pass `id_token_hint` only if the plugin later stores a safe short-lived usable value; otherwise avoid token storage
+  - pass `post_logout_redirect_uri` only when registered in Authentik
+  - clear NodeBB session before redirecting to Authentik
+- Document Authentik requirement:
+  - `default-provider-invalidation-flow` logs out only the application by default
+  - full SLO from app logout requires an invalidation flow with User Logout stage or equivalent Authentik configuration
+
+#### B3. Profile Edit Routing
+
+- Expand existing self-service URL settings into explicit managed-action settings:
+  - Authentik profile URL
+  - change email flow URL
+  - change username/profile flow URL
+  - change password flow URL
+  - MFA/devices flow URL
+  - sessions flow URL
+  - consent/app grants URL
+- Add ACP toggles:
+  - Authentik manages email
+  - Authentik manages username
+  - Authentik manages display name
+  - Authentik manages password
+  - Authentik manages MFA
+  - Authentik manages avatar
+- On `/user/<slug>/edit`, add read-only managed-field notices and action buttons to Authentik.
+- Where NodeBB provides field-specific hooks, disable local edits for managed fields.
+- Where NodeBB does not provide field-specific hooks, intercept update APIs server-side and reject writes to managed fields with a clear error.
+- Keep NodeBB-owned settings editable:
+  - notification preferences
+  - digest preferences
+  - forum UI preferences
+  - signatures/about-me only if not mapped from Authentik
+
+#### B4. Email, Username, And Password Policy
+
+- Email:
+  - Authentik is source of truth only when `email_verified === true`.
+  - NodeBB email changes should be blocked when Authentik manages email.
+  - On login, email sync can update NodeBB only if the target email is not used by another uid.
+- Username:
+  - Authentik `preferred_username` may update NodeBB username only if explicitly enabled.
+  - Username conflicts fail sync, not login, unless admin marks it login-critical.
+  - Username never affects identity mapping.
+- Password:
+  - Disable local password change UI when Authentik manages passwords.
+  - Existing local passwords remain only for emergency fallback until the admin explicitly disables local login.
+  - Do not try to keep NodeBB and Authentik passwords synchronized.
+
+#### B5. ACP UX And Rollout Modes
+
+- Add rollout presets:
+  - Mixed mode: local login/register visible, Authentik available
+  - Migration mode: Authentik preferred, local login fallback visible
+  - SSO required: `/login` and `/register` redirect to Authentik, local fallback hidden
+  - SSO enforced: local login disabled except break-glass admin route
+- Each preset should show exactly which toggles it changes.
+- Require typed confirmation before enabling SSO enforced mode.
+- Run preflight checks before allowing SSO enforced mode:
+  - at least one admin has linked Authentik
+  - back-channel logout configured or consciously skipped
+  - Authentik discovery/JWKS test passes
+  - redirect URI and logout URI match NodeBB public URL
+  - emergency admin fallback decision recorded
+
+#### B6. Testing Plan
+
+- Migration:
+  - eligible local user pre-provisions into Authentik and links on first OIDC login
+  - duplicate email blocks migration
+  - missing/unverified email blocks migration
+  - privileged user requires explicit confirmation
+  - existing Authentik account with verified matching email links to existing NodeBB uid
+  - migration API failures do not change NodeBB mappings
+  - migration cannot be replayed with a stale assertion
+- SSO replacement:
+  - `/login` redirects to Authentik when enabled
+  - `/register` redirects to Authentik enrollment when enabled
+  - emergency admin login remains reachable when configured
+  - local registration POST/API is blocked, not only hidden
+  - managed email/username/password edits are blocked server-side
+  - unmanaged profile preferences remain editable
+  - logout redirects to Authentik and clears NodeBB session
+  - Authentik back-channel logout still revokes NodeBB sessions
+
 ## Live Cleanup
 
 - Remove accidental duplicate NodeBB users created during testing.
