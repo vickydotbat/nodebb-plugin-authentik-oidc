@@ -105,6 +105,31 @@ test('fresh provider login setting defaults on and can be disabled', async () =>
 	}
 });
 
+test('clear provider session setting requires an end-session endpoint when enabled', async () => {
+	const mocks = createMocks();
+	const { config, restore } = loadConfig(mocks);
+	try {
+		assert.equal((await config.getSettings()).clearProviderSessionBeforeLogin, false);
+		await assert.rejects(
+			config.saveSettings(enabledSettings({
+				clearProviderSessionBeforeLogin: true,
+			})),
+			(err) => {
+				assert.equal(err.errors.endSessionEndpoint, 'Required');
+				return true;
+			}
+		);
+		const saved = await config.saveSettings(enabledSettings({
+			clearProviderSessionBeforeLogin: true,
+			endSessionEndpoint: 'https://auth.example.com/application/o/nodebb/end-session/',
+		}));
+		assert.equal(saved.clearProviderSessionBeforeLogin, true);
+		assert.equal(saved.endSessionEndpoint, 'https://auth.example.com/application/o/nodebb/end-session/');
+	} finally {
+		restore();
+	}
+});
+
 test('invalid self-service URLs produce field-level validation errors', async () => {
 	const mocks = createMocks();
 	const { config, restore } = loadConfig(mocks);

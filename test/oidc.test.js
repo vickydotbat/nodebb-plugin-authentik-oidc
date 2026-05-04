@@ -178,6 +178,20 @@ test('authorization URL can disable forced fresh provider login', () => {
 	}
 });
 
+test('provider logout URL returns to the plugin login route', () => {
+	const { oidc, restore } = loadOidc();
+	try {
+		const url = new URL(oidc.providerLogoutUrl(
+			{ endSessionEndpoint: 'https://auth.example.com/application/o/nodebb/end-session/' },
+			'https://forum.example.com/auth/authentik?authentikFreshLogin=1'
+		));
+		assert.equal(url.href.startsWith('https://auth.example.com/application/o/nodebb/end-session/'), true);
+		assert.equal(url.searchParams.get('post_logout_redirect_uri'), 'https://forum.example.com/auth/authentik?authentikFreshLogin=1');
+	} finally {
+		restore();
+	}
+});
+
 test('authorization URL does not override explicit provider prompt parameters', () => {
 	const { oidc, restore } = loadOidc();
 	try {

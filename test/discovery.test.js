@@ -35,10 +35,12 @@ test('discovery preserves provider issuer exactly for token validation', async (
 		token_endpoint: `${issuer}token/`,
 		userinfo_endpoint: `${issuer}userinfo/`,
 		jwks_uri: `${issuer}jwks/`,
+		end_session_endpoint: `${issuer}end-session/`,
 	});
 	try {
 		const settings = await discovery.discover('https://auth.example.com/application/o/nodebb');
 		assert.equal(settings.issuer, issuer);
+		assert.equal(settings.endSessionEndpoint, `${issuer}end-session/`);
 	} finally {
 		restore();
 	}

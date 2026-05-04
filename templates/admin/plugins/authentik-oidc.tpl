@@ -73,6 +73,12 @@
 				</div>
 
 				<div class="mb-3">
+					<label class="form-label" for="endSessionEndpoint">End-session endpoint</label>
+					<input class="form-control" id="endSessionEndpoint" type="url" data-authentik-field="endSessionEndpoint">
+					<div class="form-text text-danger" data-authentik-error="endSessionEndpoint"></div>
+				</div>
+
+				<div class="mb-3">
 					<label class="form-label" for="scopes">Scopes</label>
 					<input class="form-control" id="scopes" type="text" data-authentik-field="scopes">
 					<div class="form-text text-danger" data-authentik-error="scopes"></div>
@@ -89,6 +95,13 @@
 					<input class="form-check-input" type="checkbox" id="forceProviderLogin" data-authentik-field="forceProviderLogin">
 					<label class="form-check-label" for="forceProviderLogin">Force fresh Authentik login</label>
 					<div class="form-text">Adds <code>prompt=login</code> and <code>max_age=0</code> by default so enrollment and linking do not silently reuse another Authentik browser session.</div>
+				</div>
+
+				<div class="form-check form-switch mb-3">
+					<input class="form-check-input" type="checkbox" id="clearProviderSessionBeforeLogin" data-authentik-field="clearProviderSessionBeforeLogin">
+					<label class="form-check-label" for="clearProviderSessionBeforeLogin">Clear Authentik session before login</label>
+					<div class="form-text">Redirects through Authentik's end-session endpoint before starting OIDC login. Use this when Authentik enrollment screens show a previous user's avatar or current-session card.</div>
+					<div class="form-text text-danger" data-authentik-error="clearProviderSessionBeforeLogin"></div>
 				</div>
 
 				<div class="mb-3">

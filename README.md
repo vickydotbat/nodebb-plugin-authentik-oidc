@@ -65,6 +65,8 @@ prompt=login
 
 By default, the plugin sends `prompt=login` and `max_age=0` so Authentik enrollment and linking screens do not silently reuse another Authentik browser session. This avoids confusing account-selection screens where a new enrollment can show the avatar for an already-authenticated Authentik account. Disable "Force fresh Authentik login" only if your Authentik flow already makes account selection explicit. The plugin rejects attempts to override protocol-critical parameters such as `state`, `nonce`, `client_id`, `redirect_uri`, and `scope`.
 
+If Authentik still shows a previous user's current-session card or avatar during new enrollment, enable "Clear Authentik session before login" and populate the end-session endpoint from discovery. Add `https://your-forum.example.com/auth/authentik?authentikFreshLogin=1` as an allowed post-logout redirect URI in Authentik if your provider requires explicit post-logout redirect registration.
+
 ## Operational Notes
 
 NodeBB can only enforce identity rules after Authentik returns OIDC claims. Configure Authentik enrollment flows to reject missing email, duplicate emails, and duplicate usernames before provider-side account creation completes.
