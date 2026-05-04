@@ -149,6 +149,11 @@ define('admin/plugins/authentik-oidc', ['alerts'], function (alerts) {
 			alerts.success('Callback URL copied');
 		});
 
+		$('[data-action="copy-backchannel-logout-url"]').on('click', async function () {
+			await navigator.clipboard.writeText($('[data-authentik-field="backchannelLogoutUrl"]').val());
+			alerts.success('Back-channel logout URL copied');
+		});
+
 		$('[data-action="discover"]').on('click', async function () {
 			showErrors({});
 			try {

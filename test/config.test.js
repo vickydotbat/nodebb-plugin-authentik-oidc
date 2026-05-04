@@ -46,6 +46,20 @@ test('self-service URLs normalize and validate as optional HTTPS settings', asyn
 	}
 });
 
+test('back-channel logout setting saves and exposes computed URL', async () => {
+	const mocks = createMocks();
+	const { config, restore } = loadConfig(mocks);
+	try {
+		const saved = await config.saveSettings(enabledSettings({
+			backchannelLogoutEnabled: true,
+		}));
+		assert.equal(saved.backchannelLogoutEnabled, true);
+		assert.equal(saved.backchannelLogoutUrl, 'https://forum.example.com/auth/authentik/backchannel-logout');
+	} finally {
+		restore();
+	}
+});
+
 test('invalid self-service URLs produce field-level validation errors', async () => {
 	const mocks = createMocks();
 	const { config, restore } = loadConfig(mocks);

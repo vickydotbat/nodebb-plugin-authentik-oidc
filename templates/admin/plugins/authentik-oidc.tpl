@@ -129,6 +129,23 @@
 				</div>
 
 				<div class="form-check form-switch mb-3">
+					<input class="form-check-input" type="checkbox" id="backchannelLogoutEnabled" data-authentik-field="backchannelLogoutEnabled">
+					<label class="form-check-label" for="backchannelLogoutEnabled">Enable OIDC back-channel logout</label>
+					<div class="form-text">Configure this URL as Authentik's back-channel logout URI so Authentik session closure revokes NodeBB sessions.</div>
+				</div>
+
+				<div class="mb-3">
+					<label class="form-label" for="backchannelLogoutUrl">Back-channel logout URL</label>
+					<div class="input-group">
+						<input class="form-control" id="backchannelLogoutUrl" type="text" readonly data-authentik-field="backchannelLogoutUrl">
+						<button class="btn btn-outline-secondary" type="button" data-action="copy-backchannel-logout-url">
+							<i class="fa fa-copy"></i>
+						</button>
+					</div>
+					<div class="form-text text-danger" data-authentik-error="backchannelLogoutUrl"></div>
+				</div>
+
+				<div class="form-check form-switch mb-3">
 					<input class="form-check-input" type="checkbox" id="usePkce" data-authentik-field="usePkce">
 					<label class="form-check-label" for="usePkce">Use PKCE</label>
 				</div>

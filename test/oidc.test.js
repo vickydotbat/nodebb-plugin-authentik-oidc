@@ -83,6 +83,39 @@ function loadOidcForIdToken({ header, keys }) {
 	};
 }
 
+function loadOidcForLogoutToken({ header, keys, claims }) {
+	const originalLoad = Module._load;
+	Module._load = function (request, parent, isMain) {
+		if (request === 'jsonwebtoken') {
+			return {
+				decode() {
+					return { header };
+				},
+				verify() {
+					return claims;
+				},
+			};
+		}
+		if (request === './http' && parent && parent.filename.endsWith('/lib/oidc.js')) {
+			return {
+				async requestJson() {
+					return { keys };
+				},
+			};
+		}
+		return originalLoad.call(this, request, parent, isMain);
+	};
+	delete require.cache[require.resolve('../lib/oidc')];
+	const oidc = require('../lib/oidc');
+	return {
+		oidc,
+		restore() {
+			Module._load = originalLoad;
+			delete require.cache[require.resolve('../lib/oidc')];
+		},
+	};
+}
+
 function settings(overrides = {}) {
 	return {
 		authorizationEndpoint: 'https://auth.example.com/application/o/nodebb/authorize/',
@@ -204,6 +237,109 @@ test('ID token verification ignores non-signing keys with matching kid', async (
 				issuer: 'https://auth.example.com/application/o/nodebb/',
 			}, 'token', 'nonce-1'),
 			/Unable to find OIDC signing key/
+		);
+	} finally {
+		restore();
+	}
+});
+
+test('logout token verification accepts signed back-channel logout event', async () => {
+	const { publicKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
+	const signingJwk = publicKey.export({ format: 'jwk' });
+	signingJwk.kid = 'signing-key';
+	signingJwk.use = 'sig';
+	signingJwk.alg = 'RS256';
+
+	const { oidc, restore } = loadOidcForLogoutToken({
+		header: { alg: 'RS256', kid: 'signing-key' },
+		keys: [signingJwk],
+		claims: {
+			iss: 'https://auth.example.com/application/o/nodebb/',
+			aud: 'nodebb',
+			sub: 'sub-1',
+			sid: 'sid-1',
+			iat: Math.floor(Date.now() / 1000),
+			jti: 'logout-1',
+			events: {
+				'http://schemas.openid.net/event/backchannel-logout': {},
+			},
+		},
+	});
+	try {
+		const claims = await oidc.verifyLogoutToken({
+			jwksUri: 'https://auth.example.com/jwks/',
+			clientId: 'nodebb',
+			issuer: 'https://auth.example.com/application/o/nodebb/',
+		}, 'logout-token');
+		assert.equal(claims.sub, 'sub-1');
+		assert.equal(claims.sid, 'sid-1');
+		assert.equal(claims.jti, 'logout-1');
+	} finally {
+		restore();
+	}
+});
+
+test('logout token verification rejects missing logout event', async () => {
+	const { publicKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
+	const signingJwk = publicKey.export({ format: 'jwk' });
+	signingJwk.kid = 'signing-key';
+	signingJwk.use = 'sig';
+	signingJwk.alg = 'RS256';
+
+	const { oidc, restore } = loadOidcForLogoutToken({
+		header: { alg: 'RS256', kid: 'signing-key' },
+		keys: [signingJwk],
+		claims: {
+			sub: 'sub-1',
+			sid: 'sid-1',
+			iat: Math.floor(Date.now() / 1000),
+			jti: 'logout-1',
+			nonce: 'not-allowed',
+			events: {},
+		},
+	});
+	try {
+		await assert.rejects(
+			oidc.verifyLogoutToken({
+				jwksUri: 'https://auth.example.com/jwks/',
+				clientId: 'nodebb',
+				issuer: 'https://auth.example.com/application/o/nodebb/',
+			}, 'logout-token'),
+			/missing the back-channel logout event/
+		);
+	} finally {
+		restore();
+	}
+});
+
+test('logout token verification rejects nonce', async () => {
+	const { publicKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
+	const signingJwk = publicKey.export({ format: 'jwk' });
+	signingJwk.kid = 'signing-key';
+	signingJwk.use = 'sig';
+	signingJwk.alg = 'RS256';
+
+	const { oidc, restore } = loadOidcForLogoutToken({
+		header: { alg: 'RS256', kid: 'signing-key' },
+		keys: [signingJwk],
+		claims: {
+			sub: 'sub-1',
+			iat: Math.floor(Date.now() / 1000),
+			jti: 'logout-1',
+			nonce: 'not-allowed',
+			events: {
+				'http://schemas.openid.net/event/backchannel-logout': {},
+			},
+		},
+	});
+	try {
+		await assert.rejects(
+			oidc.verifyLogoutToken({
+				jwksUri: 'https://auth.example.com/jwks/',
+				clientId: 'nodebb',
+				issuer: 'https://auth.example.com/application/o/nodebb/',
+			}, 'logout-token'),
+			/must not contain nonce/
 		);
 	} finally {
 		restore();

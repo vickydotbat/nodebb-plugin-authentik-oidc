@@ -6,6 +6,7 @@ const privileges = require.main.require('./src/privileges');
 
 const admin = require('./lib/admin');
 const config = require('./lib/config');
+const logout = require('./lib/logout');
 const profile = require('./lib/profile');
 const AuthentikOidcStrategy = require('./lib/strategy');
 
@@ -13,6 +14,7 @@ const plugin = module.exports;
 
 plugin.init = async function ({ router, middleware }) {
 	await config.ensureDefaults();
+	router.post('/auth/authentik/backchannel-logout', logout.handleBackchannelLogout);
 	routeHelpers.setupAdminPageRoute(router, '/admin/plugins/authentik-oidc', admin.renderAdminPage);
 	routeHelpers.setupPageRoute(router, '/user/:userslug/authentik-oidc', [
 		middleware.exposeUid,

@@ -12,6 +12,7 @@ Authentik-compatible OAuth2/OIDC SSO for NodeBB with strict verified-email ident
 - Keeps username display-only and never uses it for identity matching.
 - Provides an ACP settings page with issuer discovery, secret-preserving saves, authorization parameters, username collision policy, sanitized last-failure diagnostics, mapping audit, and stale mapping repair.
 - Provides a read-only user account page for linked Authentik/OIDC status and optional Authentik self-service links without exposing OIDC subjects or mapping keys.
+- Supports optional OIDC back-channel logout so Authentik session closure can revoke NodeBB sessions.
 
 Planned profile and role/group synchronization work is tracked in [Next steps](docs/NEXT_STEPS.md). Authentik profile data such as username, email, display name, avatar, groups, and roles should be synced only through explicit admin settings after identity resolution succeeds.
 
@@ -50,6 +51,7 @@ Create an Authentik OAuth2/OpenID provider:
 - Client type: confidential
 - Redirect URI: the callback URL shown in the plugin ACP page
 - Scopes: `openid email profile`
+- Optional single logout: enable OIDC back-channel logout and set Authentik's back-channel logout URI to the URL shown in the plugin ACP page
 
 Use the issuer URL from Authentik in the plugin settings and click Discover to populate endpoints.
 
@@ -77,7 +79,7 @@ The username collision policy defaults to creating a safe unique NodeBB username
 
 Optional Authentik self-service URLs can be configured in the ACP. When set, linked users see those external profile, password, MFA, and session-management links on `/user/<userslug>/authentik-oidc`.
 
-Closing sessions from Authentik's `auth` page does not currently terminate existing NodeBB sessions. Session revocation/back-channel logout support is planned; until then, Authentik session closure only affects future SSO reauthentication.
+Closing sessions from Authentik's `auth` page requires Authentik single logout to be configured. Enable OIDC back-channel logout in this plugin's ACP page, configure the displayed back-channel logout URL in Authentik, and ensure Authentik can reach the NodeBB public URL. The plugin validates the signed logout token and revokes NodeBB sessions for the linked `sub` or stored OIDC `sid`.
 
 ## Tests
 

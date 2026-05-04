@@ -17,6 +17,7 @@ The repository now contains the first working plugin implementation:
 - Direct OAuth2/OIDC code flow with state, nonce, optional PKCE, ID token validation, userinfo retrieval, and issuer/audience validation.
 - Strict identity resolution by `sub` with verified-email linking, stale mapping cleanup, collision rejection, and create-time username retry handling.
 - ACP settings with discovery, secret-preserving saves, authorization parameters, username collision policy, sanitized last-failure diagnostics, JWKS health checks, mapping audit, stale mapping repair, and optional Authentik self-service URLs.
+- Optional OIDC back-channel logout support that validates signed logout tokens and revokes NodeBB sessions by linked `sub` or stored OIDC `sid`.
 - A self-only user account page that shows linked-account state and configured external Authentik self-service actions without exposing OIDC subjects or mapping keys.
 - Automated unit tests for identity safety, discovery issuer handling, authorization parameter handling, diagnostics sanitization, JWKS checks, username generation, mapping audit/repair, and user-facing linked-account state.
 
@@ -171,6 +172,7 @@ Storage:
 - Optional audit fields:
   - `user:<uid>.authentikLastLoginAt`
   - `user:<uid>.authentikLastEmail`
+  - `authentik:sid:uid` object-field mapping from OIDC `sid` to uid for back-channel logout when the provider emits `sid`
 
 Resolution steps:
 
@@ -236,6 +238,8 @@ Fields:
 - `userinfoEndpoint`
 - `scopes`, default `openid email profile`
 - `callbackUrl`, computed read-only
+- `backchannelLogoutEnabled`, default false
+- `backchannelLogoutUrl`, computed read-only
 - `allowInsecureCallbackUrlForDevelopment`, default false
 - `displayName`, default `Authentik`
 - Optional future fields:
@@ -318,6 +322,8 @@ Recommended validation:
 - Callback `next`/destination must be local-only. Reject absolute external URLs.
 - Admin POST routes must use NodeBB's CSRF/admin middleware.
 - Login routes should not change settings or user mappings before callback validation completes.
+- Back-channel logout route must be unauthenticated and CSRF-exempt enough for Authentik server-to-server POSTs, but must validate signed OIDC logout tokens before revoking any NodeBB session.
+- Back-channel logout is disabled by default. When enabled, it should revoke NodeBB sessions only after mapping the logout token's `sub` or `sid` to a linked uid.
 
 ## HTTPS And Proxy Concerns
 
@@ -618,6 +624,19 @@ Manual integration tests should cover:
   - disconnect requires CSRF protection, confirmation, and fallback-login verification
   - refresh/sync resolves by linked `sub`, never username or user-provided email
 - Add tests for panel rendering, permissions, external links, disconnect policy, and managed-field indicators.
+
+### Phase 11: Authentik Session Closure And Single Logout
+
+- Add an ACP toggle for OIDC back-channel logout.
+- Display and copy the computed back-channel logout URL for Authentik provider configuration.
+- Store validated OIDC `sid` from login claims when available, without exposing it in public user data.
+- Add `POST /auth/authentik/backchannel-logout`.
+- Validate the signed logout token with configured issuer, audience, JWKS, supported algorithms, required logout event, `iat`, `jti`, and no `nonce`.
+- Resolve logout by permanent `sub` first, then stored `sid`.
+- Revoke NodeBB sessions through `user.auth.revokeAllSessions(uid)`.
+- Log ignored, unmatched, and rejected logout requests without logging raw tokens.
+- Add automated tests for setting persistence, logout token validation, disabled behavior, `sub` mapping, and `sid` mapping.
+- Live-test against Authentik by closing a session from the Authentik `auth` page and confirming the linked NodeBB session is cut off.
 
 ## Release Acceptance Criteria
 

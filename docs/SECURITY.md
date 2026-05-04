@@ -77,8 +77,16 @@ Current implementation status: the user-facing page is read-only and supports on
 
 ## Session Revocation Boundary
 
-Closing or revoking sessions from Authentik's `auth` page does not currently terminate already-issued NodeBB sessions. NodeBB sessions remain valid until NodeBB logs them out, expires them, or the plugin implements explicit revocation.
+Closing or revoking sessions from Authentik's `auth` page terminates NodeBB sessions only when OIDC back-channel logout is enabled in the plugin and configured on the Authentik provider.
 
-Planned revocation support must avoid storing access, refresh, or ID tokens. It should instead link each successful login to safe identifiers such as uid, OIDC `sub`, and, if available and validated, an OIDC session id claim. Back-channel or front-channel logout handlers must validate issuer, audience/client, signature or request authenticity, and subject/session mapping before destroying NodeBB sessions.
+The back-channel logout handler:
 
-Until that support exists, operators should treat Authentik session closure as preventing future SSO reauthentication only, not as a global NodeBB logout mechanism.
+- Is disabled by default and controlled by an ACP toggle.
+- Accepts only signed OIDC logout tokens from the configured issuer/audience and JWKS.
+- Requires the standard back-channel logout event, `iat`, `jti`, and either `sub` or `sid`.
+- Rejects logout tokens with `nonce`.
+- Maps `sub` to the permanent Authentik subject mapping, or `sid` to the OIDC session id captured during login.
+- Calls NodeBB's session revocation API for the mapped uid.
+- Does not store access tokens, refresh tokens, raw ID tokens, or logout tokens.
+
+This intentionally revokes all NodeBB sessions for the mapped uid rather than trying to keep a local browser-session-to-OIDC-session graph. That is conservative for the current plugin goal: an upstream Authentik session closure should not leave an active NodeBB session behind.

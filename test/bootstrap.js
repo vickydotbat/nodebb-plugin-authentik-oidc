@@ -46,8 +46,10 @@ function createMocks() {
 		users: new Map(),
 		emailToUid: new Map(),
 		subToUid: new Map(),
+		sidToUid: new Map(),
 		objects: new Map(),
 		settings: new Map(),
+		revokedSessionsForUids: [],
 	};
 
 	const logger = {
@@ -105,12 +107,21 @@ function createMocks() {
 				}
 			},
 		},
+		auth: {
+			async revokeAllSessions(uids) {
+				const list = Array.isArray(uids) ? uids : [uids];
+				state.revokedSessionsForUids.push(...list.map(uid => parseInt(uid, 10)));
+			},
+		},
 	};
 
 	const db = {
 		async getObject(key) {
 			if (key === 'authentik:sub:uid') {
 				return Object.fromEntries(state.subToUid.entries());
+			}
+			if (key === 'authentik:sid:uid') {
+				return Object.fromEntries(state.sidToUid.entries());
 			}
 			return state.objects.get(key) || {};
 		},
@@ -121,12 +132,19 @@ function createMocks() {
 			if (key === 'authentik:sub:uid') {
 				return state.subToUid.get(field) || null;
 			}
+			if (key === 'authentik:sid:uid') {
+				return state.sidToUid.get(field) || null;
+			}
 			const object = state.objects.get(key) || {};
 			return object[field] || null;
 		},
 		async setObjectField(key, field, value) {
 			if (key === 'authentik:sub:uid') {
 				state.subToUid.set(field, parseInt(value, 10));
+				return;
+			}
+			if (key === 'authentik:sid:uid') {
+				state.sidToUid.set(field, parseInt(value, 10));
 				return;
 			}
 			const object = state.objects.get(key) || {};
@@ -136,6 +154,9 @@ function createMocks() {
 		async deleteObjectField(key, field) {
 			if (key === 'authentik:sub:uid') {
 				state.subToUid.delete(field);
+			}
+			if (key === 'authentik:sid:uid') {
+				state.sidToUid.delete(field);
 			}
 		},
 		async getSortedSetRange(key, start, stop) {

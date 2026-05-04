@@ -38,6 +38,20 @@ test('new verified OIDC user creates one NodeBB user and mapping', async () => {
 	}
 });
 
+test('login stores OIDC sid for back-channel logout mapping', async () => {
+	const mocks = createMocks();
+	const { identity, restore } = loadIdentity(mocks);
+	try {
+		const result = await identity.resolve(verified({ sid: 'session-1' }), { issuer: 'https://id.example.com' });
+		assert.equal(result.uid, 1);
+		assert.equal(mocks.state.sidToUid.get('session-1'), 1);
+		assert.equal(await identity.getUidBySid('session-1'), 1);
+		assert.equal(mocks.state.users.get(1).authentikLastSid, 'session-1');
+	} finally {
+		restore();
+	}
+});
+
 test('same sub repeatedly resolves to same uid', async () => {
 	const mocks = createMocks();
 	const { identity, restore } = loadIdentity(mocks);
