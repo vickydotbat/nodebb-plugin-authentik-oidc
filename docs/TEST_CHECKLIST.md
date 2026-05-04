@@ -124,6 +124,8 @@ Troubleshooting:
 - 2026-05-03: Repeat login for linked `archvillainette` did not create a new NodeBB account. The browser appeared to hang after provider flows, but the NodeBB session was established successfully.
 - 2026-05-03: Normal NodeBB password login still works.
 - 2026-05-04: A test enrollment account whose email was not verified in time became locked out on the Authentik side. The account remained present as inactive, could not log in, could not complete email verification, and blocked re-registration with the same username because the username was already taken. Treat expired/unverified Authentik enrollment users as provider-side cleanup debt unless Authentik flow policy deletes, reactivates, or re-sends verification for them.
+- 2026-05-04: `Clear Authentik session before login` with the discovered OIDC end-session endpoint reached Authentik's enrollment flow instead of clearing the displayed current-session avatar. ACP Last authorization showed `stage: provider-session-clear`, `clearProviderSessionBeforeLogin: true`, and redirect target `.../application/o/nodebb/end-session/?post_logout_redirect_uri=...`.
+- 2026-05-04: Switching to `Session clear endpoint override = https://auth.westgate.pw/if/flow/default-invalidation-flow/` and return parameter `next` still landed on Authentik enrollment with URL `https://auth.westgate.pw/if/flow/enrollment/?next=%2F&flow_token=...` and still displayed another user's avatar. This suggests Authentik rewrote the intended `next` target to `/` or the invalidation flow did not clear the browser session before enrollment rendered.
 
 ## Open Live Items
 
@@ -131,6 +133,7 @@ Troubleshooting:
 - Retest username collision in both ACP policies: "create a safe unique username" and "reject new SSO account creation".
 - Capture actual OIDC ID token/userinfo claims for the `email_verified: false` scenario. Do not rely on Authentik custom attributes alone.
 - Investigate Authentik account-selection/avatar behavior with the clear-session invalidation-flow override. Capture ACP Last authorization, browser redirect chain, Authentik flow slug, displayed user/avatar, final OIDC `sub`, and resolved NodeBB uid.
+- Inspect Authentik `default-invalidation-flow` and enrollment flow configuration. Confirm whether the logout stage actually clears the browser session, whether `next` is restricted/re-written to `/`, and whether the enrollment prompt intentionally displays current authenticated user context.
 - Investigate post-callback hang after successful login and confirm whether the callback response/redirect chain completes cleanly.
 - Add Authentik-side flow/policy rules to reject registration when username or email already exists in Authentik, and verify they stop registration before Authentik redirects back to NodeBB.
 - Add an Authentik-side cleanup policy or admin runbook for inactive enrollment users whose email verification expires before completion, especially because they reserve usernames and may require manual deletion or recovery.

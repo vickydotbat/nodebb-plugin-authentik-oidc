@@ -7,6 +7,7 @@
 - Top priority: resolve Authentik/NodeBB session and avatar cross-contamination before release. A new Authentik enrollment must never display or inherit another user's profile/avatar. The only acceptable case for showing an existing NodeBB avatar is verified-email linking to that exact existing NodeBB account, after identity checks have selected that uid.
 - Treat all session weirdness as both security and UX risk until proven harmless: stale Authentik browser sessions, wrong account-selection cards, wrong avatars, stale NodeBB sessions after upstream logout, post-callback hangs, and any mismatch between the displayed person and the resolved `sub`/uid.
 - Live-test the clear-session flow until ACP Last authorization proves the browser is sent through the intended Authentik invalidation/logout flow before authorization, and the subsequent Authentik UI no longer shows another user's current-session card for new enrollment.
+- Latest live result: using Authentik `default-invalidation-flow` with return parameter `next` still landed on `/if/flow/enrollment/?next=%2F...` and displayed the previous/current session avatar. Next investigation must inspect Authentik flow/stage policy: why external or same-origin authorization `next` is being collapsed to `/`, and whether the invalidation flow is actually ending the browser session before the enrollment flow renders.
 - Run one final live Authentik pass after rebuilding NodeBB with the current plugin code.
 - Capture actual OIDC claims for an intended unverified-email account and confirm `email_verified === false` is rejected. Use ACP Last failure diagnostics after the rejected callback; inspect provider-side token/userinfo only as needed.
 - Retest post-callback completion after successful repeat login and confirm the browser receives the NodeBB success redirect cleanly.
@@ -78,12 +79,21 @@
 - Added default fresh-provider-login authorization parameters to reduce Authentik browser-session reuse during enrollment and linking.
 - Added a regression test confirming new SSO-created users do not inherit `picture`, `uploadedpicture`, `icon:text`, or `icon:bgColor` from an existing NodeBB account.
 - Added clear-session controls and Last authorization diagnostics. Continue testing Authentik's invalidation/logout flow override because the OIDC end-session endpoint has been observed routing into enrollment without clearing the displayed current-session avatar.
+- Latest failed mitigation: `Session clear endpoint override = https://auth.westgate.pw/if/flow/default-invalidation-flow/` plus return parameter `next` still produced Authentik enrollment URL `next=/` and did not clear the avatar/current-session card. This likely requires Authentik-side flow configuration or a different logout endpoint, not only plugin URL changes.
 - Reproduce the "new Authentik user receives existing NodeBB avatar" issue with a clean incognito session and browser devtools network log.
 - Capture the resolved NodeBB uid, Authentik `sub`, `picture` claim, NodeBB `picture` field, and any OAuth/avatar-related request URLs immediately after account creation.
 - Verify whether the avatar shown is coming from NodeBB user data, a cached browser image, Authentik's account-selection UI, or theme-level rendering.
 - Ensure new SSO-created users do not inherit `picture`, `uploadedpicture`, `icon:text`, `icon:bgColor`, or any profile fields from the currently logged-in NodeBB session.
 - Add a test fixture for user creation where another NodeBB session/user exists, and assert only the resolved uid is updated.
 - If Authentik provides a `picture` claim, apply it only through explicit avatar synchronization settings; otherwise leave NodeBB's default generated avatar behavior intact.
+- Next technical probes:
+  - In ACP Last authorization, capture the sanitized clear-session redirect after the newest code path and confirm whether `returnTo` is `/application/o/authorize/?...` or still an external NodeBB URL.
+  - In browser devtools, capture the full redirect chain from `/auth/authentik` through invalidation flow to enrollment, including each `Location` header.
+  - In Authentik, inspect `default-invalidation-flow` stages and confirm it includes a user logout/session invalidation stage that actually clears the browser session.
+  - Check whether the enrollment flow itself is configured to show the current authenticated user before verification, and whether a policy can hide the avatar/current-session card for unauthenticated enrollment.
+  - Check Authentik's allowed redirect/next URL policy for flow executors; `next=/` suggests Authentik rejected or rewrote the intended authorization URL.
+  - Test a dedicated Authentik logout/invalidation flow created only for NodeBB SSO preflight, with a simple logout stage and a fixed redirect to the NodeBB provider authorization URL if Authentik allows it.
+  - Consider a plugin-side hard stop if Authentik returns to enrollment with an unexpected visible current-session state, but do not rely on UI state for identity decisions.
 
 ## Account Synchronization
 

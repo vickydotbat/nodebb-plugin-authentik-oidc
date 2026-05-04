@@ -66,6 +66,8 @@ The observed issue where newly-created Authentik users sometimes appeared with a
 
 NodeBB-to-Authentik avatar synchronization is acceptable only as an explicit future source-of-truth mode. It must run after identity resolution by stored `sub` or verified-email link, use a least-privilege Authentik management API token, and write the selected NodeBB uid's avatar to the linked Authentik user. It must not use browser session state, displayed avatars, usernames, or unresolved enrollment context as authority.
 
+Current live status: both OIDC end-session and Authentik invalidation-flow preflight attempts have still rendered enrollment with another user's avatar. The invalidation-flow attempt produced `next=/`, suggesting Authentik rewrote the intended return URL or did not execute the expected logout stage. Until this is resolved, session/profile contamination remains a release blocker.
+
 ## User-Facing OIDC Controls
 
 NodeBB user profile controls may show OIDC link status and synchronization state, but they must not expose writable identity mapping internals. Users should not be able to edit `authentikSub`, issuer, reverse mapping keys, or claim-derived identity state directly.
