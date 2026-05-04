@@ -78,7 +78,9 @@
   - Existing `sub` login: continue to resolve by `sub`; do not use a displayed avatar, username, or browser-session card as identity evidence.
 - Added default fresh-provider-login authorization parameters to reduce Authentik browser-session reuse during enrollment and linking.
 - Added a regression test confirming new SSO-created users do not inherit `picture`, `uploadedpicture`, `icon:text`, or `icon:bgColor` from an existing NodeBB account.
+- Added a regression test simulating a current NodeBB session user whose avatar/profile fields leak into `user.create`; new SSO-created users are scrubbed back to clean profile fields and the session user's avatar is untouched.
 - Added clear-session controls and Last authorization diagnostics. Continue testing Authentik's invalidation/logout flow override because the OIDC end-session endpoint has been observed routing into enrollment without clearing the displayed current-session avatar.
+- Expanded Last authorization diagnostics to preserve sanitized provider-relative clear-session `returnTo` targets and record the return parameter, so live testing can tell whether the plugin sent `/application/o/authorize/...` or an external NodeBB URL.
 - Latest failed mitigation: `Session clear endpoint override = https://auth.westgate.pw/if/flow/default-invalidation-flow/` plus return parameter `next` still produced Authentik enrollment URL `next=/` and did not clear the avatar/current-session card. This likely requires Authentik-side flow configuration or a different logout endpoint, not only plugin URL changes.
 - Reproduce the "new Authentik user receives existing NodeBB avatar" issue with a clean incognito session and browser devtools network log.
 - Capture the resolved NodeBB uid, Authentik `sub`, `picture` claim, NodeBB `picture` field, and any OAuth/avatar-related request URLs immediately after account creation.

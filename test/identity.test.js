@@ -91,6 +91,49 @@ test('new verified OIDC user does not inherit existing account avatar fields', a
 	}
 });
 
+test('new verified OIDC user does not inherit avatar fields from current NodeBB session user', async () => {
+	const mocks = createMocks();
+	const { identity, restore } = loadIdentity(mocks);
+	try {
+		const sessionUid = await mocks.user.create({
+			username: 'active-local-user',
+			email: 'active@example.com',
+			picture: 'https://forum.example.com/assets/uploads/profile/session-avatar.png',
+			uploadedpicture: '/assets/uploads/profile/session-avatar.png',
+			'icon:text': 'S',
+			'icon:bgColor': '#654321',
+			aboutme: 'session user bio',
+		});
+		const originalCreate = mocks.user.create;
+		mocks.user.create = async (data, opts) => {
+			const uid = await originalCreate(data, opts);
+			Object.assign(mocks.state.users.get(uid), {
+				picture: mocks.state.users.get(sessionUid).picture,
+				uploadedpicture: mocks.state.users.get(sessionUid).uploadedpicture,
+				'icon:text': mocks.state.users.get(sessionUid)['icon:text'],
+				'icon:bgColor': mocks.state.users.get(sessionUid)['icon:bgColor'],
+				aboutme: mocks.state.users.get(sessionUid).aboutme,
+			});
+			return uid;
+		};
+		const result = await identity.resolve(verified({
+			sub: 'new-session-isolated-user',
+			email: 'isolated@example.com',
+			preferred_username: 'isolated',
+		}), { issuer: 'https://id.example.com' });
+		assert.notEqual(result.uid, sessionUid);
+		const created = mocks.state.users.get(result.uid);
+		assert.equal(created.picture, '');
+		assert.equal(created.uploadedpicture, '');
+		assert.equal(created['icon:text'], '');
+		assert.equal(created['icon:bgColor'], '');
+		assert.equal(created.aboutme, '');
+		assert.equal(mocks.state.users.get(sessionUid).picture, 'https://forum.example.com/assets/uploads/profile/session-avatar.png');
+	} finally {
+		restore();
+	}
+});
+
 test('verified-email link to existing NodeBB account preserves existing avatar fields', async () => {
 	const mocks = createMocks();
 	const existingUid = await mocks.user.create({
@@ -242,6 +285,61 @@ test('unverified email rejects without creating or linking', async () => {
 		);
 		assert.equal(mocks.state.users.size, 0);
 		assert.equal(mocks.state.subToUid.size, 0);
+	} finally {
+		restore();
+	}
+});
+
+test('existing sub with unverified changed email still resolves by sub without linking email', async () => {
+	const mocks = createMocks();
+	mocks.state.users.set(1, {
+		uid: 1,
+		username: 'linked',
+		email: 'person@example.com',
+		authentikSub: 'sub-1',
+	});
+	mocks.state.emailToUid.set('person@example.com', 1);
+	mocks.state.subToUid.set('sub-1', 1);
+	const { identity, restore } = loadIdentity(mocks);
+	try {
+		const result = await identity.resolve(verified({
+			email: 'changed-unverified@example.com',
+			email_verified: false,
+		}), { issuer: 'https://id.example.com' });
+		assert.equal(result.uid, 1);
+		assert.equal(mocks.state.emailToUid.has('changed-unverified@example.com'), false);
+		assert.equal(mocks.state.users.size, 1);
+	} finally {
+		restore();
+	}
+});
+
+test('existing sub with unverified email belonging to another uid fails safely', async () => {
+	const mocks = createMocks();
+	mocks.state.users.set(1, {
+		uid: 1,
+		username: 'linked',
+		email: 'person@example.com',
+		authentikSub: 'sub-1',
+	});
+	mocks.state.users.set(2, {
+		uid: 2,
+		username: 'other',
+		email: 'other@example.com',
+	});
+	mocks.state.emailToUid.set('person@example.com', 1);
+	mocks.state.emailToUid.set('other@example.com', 2);
+	mocks.state.subToUid.set('sub-1', 1);
+	const { identity, restore } = loadIdentity(mocks);
+	try {
+		await assert.rejects(
+			identity.resolve(verified({
+				email: 'other@example.com',
+				email_verified: false,
+			}), { issuer: 'https://id.example.com' }),
+			/different accounts/
+		);
+		assert.equal(mocks.state.subToUid.get('sub-1'), 1);
 	} finally {
 		restore();
 	}

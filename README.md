@@ -7,7 +7,7 @@ Authentik-compatible OAuth2/OIDC SSO for NodeBB with strict verified-email ident
 - Adds `/auth/authentik` and `/auth/authentik/callback` through NodeBB's SSO strategy flow.
 - Uses OIDC `sub` as the permanent external identity.
 - Links existing NodeBB users by email only when `email_verified === true`.
-- Rejects missing/unverified email for unlinked identities.
+- Rejects missing email for all identities and rejects unverified email for unlinked identities.
 - Rejects `sub`/email collisions instead of silently creating duplicate users.
 - Keeps username display-only and never uses it for identity matching.
 - Can run in link-only mode by disabling new SSO account creation while still allowing verified-email links to existing NodeBB users.
@@ -78,6 +78,8 @@ If testing unverified email behavior, inspect the actual OIDC ID token or userin
 Use Identity Mapping Diagnostics in the ACP to audit subject mappings. The plugin writes both the auditable `authentik:sub:uid` object mapping and the direct `authentik:sub:<sub>` lookup key for compatibility; the repair action only removes stale subject mappings that point to missing NodeBB users and requires confirmation.
 
 Use Last failure in the ACP diagnostics section when an OIDC callback is rejected. It stores only sanitized metadata such as rejection code, claim presence, `email_verified` type/value, issuer metadata, and whether userinfo was used. It does not store raw tokens, authorization codes, full claim payloads, or email addresses.
+
+Use Last authorization when debugging Authentik session/avatar contamination. For clear-session preflight requests it records the sanitized provider logout/invalidation target, the configured return parameter, and whether the return target was converted to a provider-relative authorization URL.
 
 Provider URLs and self-service links must be HTTPS by default and cannot target localhost or private network addresses. The loopback HTTP exception is only for explicit local development.
 

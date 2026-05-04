@@ -163,9 +163,12 @@ define('admin/plugins/authentik-oidc', ['alerts'], function (alerts) {
 			clearProviderSessionBeforeLogin: result.clearProviderSessionBeforeLogin,
 			forceProviderLogin: result.forceProviderLogin,
 			hasEndSessionEndpoint: result.hasEndSessionEndpoint,
+			sessionClearEndpointOverride: result.sessionClearEndpointOverride,
+			sessionClearReturnParameter: result.sessionClearReturnParameter,
 			authorizationParameters: result.authorizationParameters,
 			redirectTarget: result.redirectTarget,
 			returnTo: result.returnTo,
+			returnToWasProviderRelative: result.returnToWasProviderRelative,
 		}, null, 2));
 	}
 

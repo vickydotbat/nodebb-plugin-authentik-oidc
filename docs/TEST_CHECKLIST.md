@@ -12,7 +12,8 @@ Covered baseline cases:
 - Unverified email rejects without creating or linking.
 - Username conflict produces a unique username.
 - Existing `sub` with changed email still resolves by sub.
-- `sub` mapped to uid A but email belongs to uid B rejects.
+- Existing `sub` with changed unverified email still resolves by sub without using that email to link or create an account.
+- `sub` mapped to uid A but email belongs to uid B rejects, even when the emitted email is unverified.
 - Missing email rejects.
 - String `"true"` for `email_verified` rejects.
 - Optional display name sync updates `fullname` only after successful identity resolution and does not blank it when `name` is missing.
@@ -22,6 +23,7 @@ Covered baseline cases:
 - Username collision reject policy fails closed without creating a user or mapping.
 - Disabling new SSO account creation rejects brand-new verified users without creating a user or mapping, while verified-email linking to an existing account still works.
 - Last failure diagnostics store sanitized claim metadata without raw tokens or email addresses.
+- Last authorization diagnostics preserve a sanitized provider-relative clear-session return target and do not store state or nonce.
 - JWKS diagnostics report only sanitized signing-key metadata and fail when no supported signing key exists.
 - Authentik self-service URLs are trimmed, saved, and validated as optional HTTPS settings.
 - Provider URL validation rejects localhost/private network targets by default.
@@ -90,6 +92,7 @@ Troubleshooting:
 - For brand-new Authentik enrollment with no verified-email match, confirm Authentik does not show another user's NodeBB avatar/current-session profile and NodeBB creates a clean user only after verified claims resolve safely.
 - For verified-email linking to an existing NodeBB account, confirm preserving/showing that existing NodeBB account's avatar is acceptable and that the resolved uid is exactly the account whose verified email matched.
 - Use ACP Last authorization after each session-contamination test and record whether the plugin used direct authorization, OIDC end-session, or an Authentik invalidation/logout flow override.
+- When using an Authentik invalidation/logout flow override with `next`, confirm Last authorization shows `returnTo` as a provider-relative `/application/o/authorize/...` URL with state and nonce removed.
 - Capture the Authentik `sub`, email, `email_verified`, and preferred username for each live test account.
 - Confirm the NodeBB database has subject mappings for the successful login: `authentik:sub:uid` contains the `sub`, the direct `authentik:sub:<sub>` key points to the same uid, and the target user has `authentikSub`, `authentikIssuer`, `authentikLinkedAt`, and `authentikLastLoginAt`.
 - Confirm repeated login with the same Authentik account returns to the same NodeBB uid and does not create another account.

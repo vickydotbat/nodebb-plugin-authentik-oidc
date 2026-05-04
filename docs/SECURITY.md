@@ -6,7 +6,7 @@ The plugin deliberately rejects logins when:
 
 - `sub` is missing.
 - `email` is missing.
-- `email_verified` is missing, false, or a non-boolean value.
+- `email_verified` is missing, false, or a non-boolean value for an identity that is not already linked by `sub`.
 - An existing `sub` mapping and verified email point to different NodeBB users.
 - A verified email belongs to a NodeBB account already linked to another `sub`.
 - ID token and userinfo `sub` values differ.
@@ -15,9 +15,13 @@ The plugin never links or finds accounts by username. `preferred_username` and `
 
 Admins can disable new SSO account creation. In that mode, an existing `sub` mapping still logs in and a verified email can still link to an existing NodeBB user, but an otherwise new verified OIDC identity is rejected without creating a user or mapping.
 
+Already-linked accounts continue to resolve by stored `sub` when the provider later emits an unverified email claim, as long as the email is present and does not collide with another NodeBB uid. The unverified email is not used to create or link an account.
+
 Secrets, authorization codes, access tokens, refresh tokens, and raw ID tokens must not be logged. Admin settings responses show only a placeholder when a client secret is saved.
 
 The ACP Last failure diagnostic stores only sanitized failure metadata: rejection code, stage, issuer metadata, claim presence flags, `email_verified` type/value, and whether userinfo contributed claims. It deliberately does not store raw tokens, authorization codes, full ID token/userinfo payloads, email addresses, or usernames.
+
+The ACP Last authorization diagnostic stores sanitized authorization and clear-session preflight metadata, including whether the return target was provider-relative. This is intended for debugging Authentik flow rewrites such as `next=/` without storing state, nonce, PKCE verifier data, authorization codes, or tokens.
 
 The user-facing linked-account page deliberately does not expose the OIDC `sub`, reverse mapping keys, raw claims, tokens, or authorization artifacts. It shows only linked status, provider display name, issuer, timestamps, the last provider email seen by the plugin, and configured external self-service links.
 
@@ -29,7 +33,7 @@ Admin-triggered provider discovery, JWKS diagnostics, provider endpoints, and se
 
 The plugin can only enforce identity rules after Authentik redirects back with OIDC claims. It cannot stop Authentik from creating or verifying an Authentik-side account during an upstream enrollment flow. Authentik flows and policies should block provider-side registration when a username or email is already in use, when email is missing, or when the user has not completed the intended verification step.
 
-For live testing, do not assume Authentik custom attributes change OIDC claims. A custom attribute such as `email_verified: false` must be verified by inspecting the actual ID token or userinfo response. The plugin rejects only when the received `email_verified` claim is the boolean `false`, missing, or any non-boolean value.
+For live testing, do not assume Authentik custom attributes change OIDC claims. A custom attribute such as `email_verified: false` must be verified by inspecting the actual ID token or userinfo response. For unlinked identities, the plugin rejects when the received `email_verified` claim is the boolean `false`, missing, or any non-boolean value.
 
 ## Hardening Backlog
 
