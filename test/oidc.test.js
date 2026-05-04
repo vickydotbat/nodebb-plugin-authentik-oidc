@@ -209,6 +209,28 @@ test('provider logout URL can use an Authentik flow with next return parameter',
 	}
 });
 
+test('provider relative URL keeps same-origin authorization returns inside Authentik', () => {
+	const { oidc, restore } = loadOidc();
+	try {
+		assert.equal(
+			oidc.providerRelativeUrl(
+				'https://auth.example.com/application/o/authorize/?client_id=nodebb',
+				'https://auth.example.com/if/flow/default-invalidation-flow/'
+			),
+			'/application/o/authorize/?client_id=nodebb'
+		);
+		assert.equal(
+			oidc.providerRelativeUrl(
+				'https://forum.example.com/auth/authentik?authentikFreshLogin=1',
+				'https://auth.example.com/if/flow/default-invalidation-flow/'
+			),
+			'https://forum.example.com/auth/authentik?authentikFreshLogin=1'
+		);
+	} finally {
+		restore();
+	}
+});
+
 test('authorization URL does not override explicit provider prompt parameters', () => {
 	const { oidc, restore } = loadOidc();
 	try {

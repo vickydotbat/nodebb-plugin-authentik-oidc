@@ -65,7 +65,7 @@ When testing enrollment or linking, Authentik browser sessions can make the wron
 - Test in a clean or incognito browser profile.
 - Keep the plugin ACP "Force fresh Authentik login" setting enabled. It sends `prompt=login` and `max_age=0` unless you explicitly configure your own prompt parameters.
 - If Authentik still shows the previous user's current-session card or avatar, enable the plugin ACP "Clear Authentik session before login" setting and populate the discovered end-session endpoint.
-- If the OIDC end-session endpoint routes into the enrollment flow instead of clearing the browser session, set "Session clear endpoint override" to an Authentik invalidation/logout flow, for example `https://auth.example.com/if/flow/default-invalidation-flow/`, and set "Session clear return parameter" to `next`.
+- If the OIDC end-session endpoint routes into the enrollment flow instead of clearing the browser session, set "Session clear endpoint override" to an Authentik invalidation/logout flow, for example `https://auth.example.com/if/flow/default-invalidation-flow/`, and set "Session clear return parameter" to `next`. The plugin will send `next` to Authentik's own authorization URL, not to an external NodeBB URL.
 - If Authentik requires explicit post-logout redirect registration, allow the plugin login URL with `?authentikFreshLogin=1`.
 - Use `prompt=select_account` only if your Authentik version and flow support the expected account-selection behavior.
 - Build an Authentik authorization flow that makes account selection visible when users commonly share browsers.
