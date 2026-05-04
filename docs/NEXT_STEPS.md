@@ -37,8 +37,8 @@
 
 ### P4: Authentik-Side Enrollment Polish
 
-- Document Authentik flow/policy recipes for duplicate username/email rejection, required email, claim mapping, account selection, and external profile management.
-- Add optional deep links from NodeBB to Authentik self-service flows, but do not make the NodeBB plugin depend on Authentik admin APIs for core login.
+- Added [Authentik setup and enrollment hardening](AUTHENTIK_SETUP.md) with operator recipes for required email, `email_verified` claim mapping, duplicate username/email rejection, account selection, external self-service links, and back-channel logout.
+- Added optional deep links from NodeBB to Authentik self-service flows, without making the NodeBB plugin depend on Authentik admin APIs for core login.
 
 ## Release Blockers
 
@@ -66,6 +66,8 @@
 
 ## Avatar Investigation
 
+- Added default fresh-provider-login authorization parameters to reduce Authentik browser-session reuse during enrollment and linking.
+- Added a regression test confirming new SSO-created users do not inherit `picture`, `uploadedpicture`, `icon:text`, or `icon:bgColor` from an existing NodeBB account.
 - Reproduce the "new Authentik user receives existing NodeBB avatar" issue with a clean incognito session and browser devtools network log.
 - Capture the resolved NodeBB uid, Authentik `sub`, `picture` claim, NodeBB `picture` field, and any OAuth/avatar-related request URLs immediately after account creation.
 - Verify whether the avatar shown is coming from NodeBB user data, a cached browser image, Authentik's account-selection UI, or theme-level rendering.

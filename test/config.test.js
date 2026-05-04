@@ -90,6 +90,21 @@ test('profile sync setting defaults off and can be enabled', async () => {
 	}
 });
 
+test('fresh provider login setting defaults on and can be disabled', async () => {
+	const mocks = createMocks();
+	const { config, restore } = loadConfig(mocks);
+	try {
+		assert.equal((await config.getSettings()).forceProviderLogin, true);
+		const saved = await config.saveSettings(enabledSettings({
+			forceProviderLogin: false,
+		}));
+		assert.equal(saved.forceProviderLogin, false);
+		assert.equal((await config.getSettings()).forceProviderLogin, false);
+	} finally {
+		restore();
+	}
+});
+
 test('invalid self-service URLs produce field-level validation errors', async () => {
 	const mocks = createMocks();
 	const { config, restore } = loadConfig(mocks);

@@ -122,6 +122,7 @@ function settings(overrides = {}) {
 		clientId: 'nodebb',
 		scopes: 'openid email profile',
 		authorizationParameters: '',
+		forceProviderLogin: true,
 		...overrides,
 	};
 }
@@ -140,6 +141,57 @@ test('authorization URL includes configured provider parameters', () => {
 		assert.equal(url.searchParams.get('state'), 'state-1');
 		assert.equal(url.searchParams.get('nonce'), 'nonce-1');
 		assert.equal(url.searchParams.get('code_challenge'), 'challenge-1');
+	} finally {
+		restore();
+	}
+});
+
+test('authorization URL forces fresh provider login by default', () => {
+	const { oidc, restore } = loadOidc();
+	try {
+		const url = new URL(oidc.authorizationUrl(
+			settings({ forceProviderLogin: true }),
+			'https://forum.example.com/auth/authentik/callback',
+			'state-1',
+			{ nonce: 'nonce-1' }
+		));
+		assert.equal(url.searchParams.get('prompt'), 'login');
+		assert.equal(url.searchParams.get('max_age'), '0');
+	} finally {
+		restore();
+	}
+});
+
+test('authorization URL can disable forced fresh provider login', () => {
+	const { oidc, restore } = loadOidc();
+	try {
+		const url = new URL(oidc.authorizationUrl(
+			settings({ forceProviderLogin: false }),
+			'https://forum.example.com/auth/authentik/callback',
+			'state-1',
+			{ nonce: 'nonce-1' }
+		));
+		assert.equal(url.searchParams.has('prompt'), false);
+		assert.equal(url.searchParams.has('max_age'), false);
+	} finally {
+		restore();
+	}
+});
+
+test('authorization URL does not override explicit provider prompt parameters', () => {
+	const { oidc, restore } = loadOidc();
+	try {
+		const url = new URL(oidc.authorizationUrl(
+			settings({
+				forceProviderLogin: true,
+				authorizationParameters: 'prompt=select_account&max_age=300',
+			}),
+			'https://forum.example.com/auth/authentik/callback',
+			'state-1',
+			{ nonce: 'nonce-1' }
+		));
+		assert.equal(url.searchParams.get('prompt'), 'select_account');
+		assert.equal(url.searchParams.get('max_age'), '300');
 	} finally {
 		restore();
 	}

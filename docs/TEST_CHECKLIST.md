@@ -41,14 +41,16 @@ Covered baseline cases:
 2. Set redirect URI to the callback URL shown in the NodeBB ACP.
 3. Enable the plugin and fill issuer, client id, client secret, scopes, endpoints, and JWKS URI.
 4. Use discovery from issuer and confirm endpoints populate correctly.
-5. Login with a new verified Authentik user.
-6. Login again with the same Authentik user and confirm the same uid is used.
-7. Create a local NodeBB account with the same verified email and confirm SSO links to it without duplicate creation.
-8. Test an Authentik user with unverified email and confirm login is rejected.
-9. Change the provider email after linking and confirm login still resolves by `sub`.
-10. Create a deliberate sub/email collision and confirm login fails closed with a warning log.
-11. Disable new SSO account creation and confirm a brand-new verified Authentik user is rejected without a NodeBB user or mapping.
-12. With new SSO account creation still disabled, confirm an existing NodeBB account with the same verified email links successfully.
+5. Configure Authentik email scope mapping so `email_verified` reflects the intended verification state.
+6. Configure Authentik enrollment policies for required email and the desired duplicate email/username rejection behavior.
+7. Login with a new verified Authentik user.
+8. Login again with the same Authentik user and confirm the same uid is used.
+9. Create a local NodeBB account with the same verified email and confirm SSO links to it without duplicate creation.
+10. Test an Authentik user with unverified email and confirm the actual OIDC claim is boolean `false` and login is rejected.
+11. Change the provider email after linking and confirm login still resolves by `sub`.
+12. Create a deliberate sub/email collision and confirm login fails closed with a warning log.
+13. Disable new SSO account creation and confirm a brand-new verified Authentik user is rejected without a NodeBB user or mapping.
+14. With new SSO account creation still disabled, confirm an existing NodeBB account with the same verified email links successfully.
 
 ## Manual Back-Channel Logout
 
@@ -125,6 +127,6 @@ Troubleshooting:
 - Capture actual OIDC ID token/userinfo claims for the `email_verified: false` scenario. Do not rely on Authentik custom attributes alone.
 - Investigate Authentik account-selection/avatar behavior. Decide whether to add optional `prompt=login`, `prompt=select_account`, or an admin-configurable authorization parameter field.
 - Investigate post-callback hang after successful login and confirm whether the callback response/redirect chain completes cleanly.
-- Add Authentik-side flow/policy rules to reject registration when username or email already exists in Authentik, and document that NodeBB can only enforce checks after OIDC claims return.
+- Add Authentik-side flow/policy rules to reject registration when username or email already exists in Authentik, and verify they stop registration before Authentik redirects back to NodeBB.
 - Live-test the linked-account profile page after rebuilding NodeBB and confirm the self-only profile menu route renders under the active theme.
 - Live-test NodeBB session revocation after upstream Authentik logout/session closure with Authentik back-channel logout enabled, including verification that Authentik POSTed a `logout_token` to NodeBB.

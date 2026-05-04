@@ -37,7 +37,7 @@ For live testing, do not assume Authentik custom attributes change OIDC claims. 
 - Add tests or live verification for provider-specific prompts such as `prompt=login` or `prompt=select_account`.
 - Evaluate whether the strict username-collision policy should become the recommended release default for this installation. This is a product/admin policy, not an identity-safety requirement.
 - Add cleanup tooling for stale `authentik:sub:uid` mappings and duplicate test accounts created during early live testing.
-- Document Authentik flow policies for rejecting missing email and pre-existing username/email before provider-side account creation completes.
+- Keep Authentik-side flow/policy guidance current as Authentik changes its email-verification and logout behavior.
 - Consider DNS resolution checks for discovery/JWKS requests if the deployment allows arbitrary hostnames that can resolve to private addresses.
 
 ## Profile Synchronization Security

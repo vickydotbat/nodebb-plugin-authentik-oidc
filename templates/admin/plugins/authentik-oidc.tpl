@@ -85,6 +85,12 @@
 					<div class="form-text text-danger" data-authentik-error="authorizationParameters"></div>
 				</div>
 
+				<div class="form-check form-switch mb-3">
+					<input class="form-check-input" type="checkbox" id="forceProviderLogin" data-authentik-field="forceProviderLogin">
+					<label class="form-check-label" for="forceProviderLogin">Force fresh Authentik login</label>
+					<div class="form-text">Adds <code>prompt=login</code> and <code>max_age=0</code> by default so enrollment and linking do not silently reuse another Authentik browser session.</div>
+				</div>
+
 				<div class="mb-3">
 					<label class="form-label" for="selfServiceProfileUrl">Self-service profile URL</label>
 					<input class="form-control" id="selfServiceProfileUrl" type="url" data-authentik-field="selfServiceProfileUrl">

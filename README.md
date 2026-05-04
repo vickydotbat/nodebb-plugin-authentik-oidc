@@ -55,7 +55,7 @@ Create an Authentik OAuth2/OpenID provider:
 - Scopes: `openid email profile`
 - Optional single logout: enable OIDC back-channel logout and set Authentik's back-channel logout URI to the URL shown in the plugin ACP page
 
-Use the issuer URL from Authentik in the plugin settings and click Discover to populate endpoints.
+Use the issuer URL from Authentik in the plugin settings and click Discover to populate endpoints. For Authentik-side enrollment, email-verification, duplicate-account, account-selection, and logout guidance, see [Authentik setup and enrollment hardening](docs/AUTHENTIK_SETUP.md).
 
 Optional provider authorization parameters can be configured as a query string, for example:
 
@@ -63,11 +63,13 @@ Optional provider authorization parameters can be configured as a query string, 
 prompt=login
 ```
 
-Use this when testing account selection or when an existing Authentik browser session is causing the wrong account to be reused. The plugin rejects attempts to override protocol-critical parameters such as `state`, `nonce`, `client_id`, `redirect_uri`, and `scope`.
+By default, the plugin sends `prompt=login` and `max_age=0` so Authentik enrollment and linking screens do not silently reuse another Authentik browser session. This avoids confusing account-selection screens where a new enrollment can show the avatar for an already-authenticated Authentik account. Disable "Force fresh Authentik login" only if your Authentik flow already makes account selection explicit. The plugin rejects attempts to override protocol-critical parameters such as `state`, `nonce`, `client_id`, `redirect_uri`, and `scope`.
 
 ## Operational Notes
 
 NodeBB can only enforce identity rules after Authentik returns OIDC claims. Configure Authentik enrollment flows to reject missing email, duplicate emails, and duplicate usernames before provider-side account creation completes.
+
+Authentik 2025.10 and newer default the standard email scope's `email_verified` claim to `false`; older Authentik releases may have emitted `true` by default. Use an explicit Authentik email scope mapping that reflects your real verification state, then confirm the actual ID token or userinfo response contains the expected boolean value.
 
 If testing unverified email behavior, inspect the actual OIDC ID token or userinfo response. Authentik custom attributes do not necessarily change the emitted `email_verified` claim.
 

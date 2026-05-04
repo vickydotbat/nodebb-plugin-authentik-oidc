@@ -39,6 +39,85 @@ test('new verified OIDC user creates one NodeBB user and mapping', async () => {
 	}
 });
 
+test('new verified OIDC user does not inherit existing account avatar fields', async () => {
+	const mocks = createMocks();
+	const { identity, restore } = loadIdentity(mocks);
+	try {
+		const existingUid = await mocks.user.create({
+			username: 'archvillainette',
+			email: 'arch@example.com',
+			picture: 'https://forum.example.com/assets/uploads/profile/avatar.png',
+			uploadedpicture: '/assets/uploads/profile/avatar.png',
+			'icon:text': 'A',
+			'icon:bgColor': '#123456',
+			aboutme: 'existing user bio',
+			signature: 'existing signature',
+			'cover:url': '/assets/uploads/profile/cover.png',
+		});
+		const originalCreate = mocks.user.create;
+		mocks.user.create = async (data, opts) => {
+			const uid = await originalCreate(data, opts);
+			Object.assign(mocks.state.users.get(uid), {
+				picture: 'https://forum.example.com/assets/uploads/profile/avatar.png',
+				uploadedpicture: '/assets/uploads/profile/avatar.png',
+				'icon:text': 'A',
+				'icon:bgColor': '#123456',
+				aboutme: 'existing user bio',
+				signature: 'existing signature',
+				'cover:url': '/assets/uploads/profile/cover.png',
+			});
+			return uid;
+		};
+		const result = await identity.resolve(verified({
+			sub: 'new-authentik-user',
+			email: 'new@example.com',
+			preferred_username: 'new-user',
+			picture: 'https://auth.example.com/avatar/current-session.png',
+		}), { issuer: 'https://id.example.com' });
+		assert.notEqual(result.uid, existingUid);
+		const created = mocks.state.users.get(result.uid);
+		assert.equal(created.picture, '');
+		assert.equal(created.uploadedpicture, '');
+		assert.equal(created['icon:text'], '');
+		assert.equal(created['icon:bgColor'], '');
+		assert.equal(created.aboutme, '');
+		assert.equal(created.signature, '');
+		assert.equal(created['cover:url'], '');
+		assert.equal(created.fullname, 'Person Example');
+		assert.equal(mocks.state.users.get(existingUid).picture, 'https://forum.example.com/assets/uploads/profile/avatar.png');
+		assert.equal(mocks.state.users.get(existingUid).aboutme, 'existing user bio');
+	} finally {
+		restore();
+	}
+});
+
+test('verified-email link to existing NodeBB account preserves existing avatar fields', async () => {
+	const mocks = createMocks();
+	const existingUid = await mocks.user.create({
+		username: 'archvillainette',
+		email: 'person@example.com',
+		picture: 'https://forum.example.com/assets/uploads/profile/avatar.png',
+		uploadedpicture: '/assets/uploads/profile/avatar.png',
+		'icon:text': 'A',
+		'icon:bgColor': '#123456',
+		aboutme: 'existing user bio',
+	});
+	const { identity, restore } = loadIdentity(mocks);
+	try {
+		const result = await identity.resolve(verified(), { issuer: 'https://id.example.com' });
+		assert.equal(result.uid, existingUid);
+		const linked = mocks.state.users.get(existingUid);
+		assert.equal(linked.picture, 'https://forum.example.com/assets/uploads/profile/avatar.png');
+		assert.equal(linked.uploadedpicture, '/assets/uploads/profile/avatar.png');
+		assert.equal(linked['icon:text'], 'A');
+		assert.equal(linked['icon:bgColor'], '#123456');
+		assert.equal(linked.aboutme, 'existing user bio');
+		assert.equal(linked.authentikSub, 'sub-1');
+	} finally {
+		restore();
+	}
+});
+
 test('direct subject key resolves existing linked user for spec-compatible storage', async () => {
 	const mocks = createMocks();
 	mocks.state.users.set(42, {
