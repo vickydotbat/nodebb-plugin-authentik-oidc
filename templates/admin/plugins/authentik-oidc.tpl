@@ -243,10 +243,10 @@
 						</tbody>
 					</table>
 				</div>
-				<pre class="border rounded p-3 bg-light text-body-secondary" data-authentik-last-failure>No failure diagnostics loaded.</pre>
-				<pre class="border rounded p-3 bg-light text-body-secondary" data-authentik-last-logout>No back-channel logout request recorded.</pre>
-				<pre class="border rounded p-3 bg-light text-body-secondary" data-authentik-last-authorization>No authorization-start diagnostics loaded.</pre>
-				<pre class="border rounded p-3 bg-light text-body-secondary" data-authentik-jwks-result>No JWKS test has run yet.</pre>
+				<pre class="border rounded p-3 bg-body text-body" data-authentik-last-failure>No failure diagnostics loaded.</pre>
+				<pre class="border rounded p-3 bg-body text-body" data-authentik-last-logout>No back-channel logout request recorded.</pre>
+				<pre class="border rounded p-3 bg-body text-body" data-authentik-last-authorization>No authorization-start diagnostics loaded.</pre>
+				<pre class="border rounded p-3 bg-body text-body" data-authentik-jwks-result>No JWKS test has run yet.</pre>
 			</section>
 		</div>
 	</div>

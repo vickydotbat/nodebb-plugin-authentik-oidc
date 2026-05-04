@@ -62,7 +62,9 @@ Role/group attachment synchronization is higher risk than profile synchronizatio
 - Privileged groups and roles require explicit admin confirmation and should be disabled by default. This includes NodeBB admin/moderator groups and Authentik administrative roles.
 - Role sync failures should not alter identity mappings. By default they should allow login to complete, record an audit warning, and leave access unchanged unless an admin marks a mapping as login-critical.
 
-The observed issue where newly-created Authentik users sometimes appeared with an existing NodeBB avatar should be treated as a profile-isolation bug until proven to be only Authentik/browser-session UI. New SSO account creation must update profile fields only on the resolved uid.
+The observed issue where newly-created Authentik users sometimes appeared with an existing NodeBB avatar is a P0 session/profile contamination risk until fully explained and fixed. It is not merely cosmetic: it can indicate that backend session state, account-selection UI, or profile synchronization is pointing the user at another profile. New SSO account creation must update profile fields only on the resolved uid. The only acceptable case for showing an existing NodeBB avatar during Authentik login/enrollment is verified-email linking to that exact existing NodeBB account after identity checks select that uid.
+
+NodeBB-to-Authentik avatar synchronization is acceptable only as an explicit future source-of-truth mode. It must run after identity resolution by stored `sub` or verified-email link, use a least-privilege Authentik management API token, and write the selected NodeBB uid's avatar to the linked Authentik user. It must not use browser session state, displayed avatars, usernames, or unresolved enrollment context as authority.
 
 ## User-Facing OIDC Controls
 

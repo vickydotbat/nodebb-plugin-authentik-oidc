@@ -4,6 +4,9 @@
 
 ### P0: Release-Critical Identity Safety
 
+- Top priority: resolve Authentik/NodeBB session and avatar cross-contamination before release. A new Authentik enrollment must never display or inherit another user's profile/avatar. The only acceptable case for showing an existing NodeBB avatar is verified-email linking to that exact existing NodeBB account, after identity checks have selected that uid.
+- Treat all session weirdness as both security and UX risk until proven harmless: stale Authentik browser sessions, wrong account-selection cards, wrong avatars, stale NodeBB sessions after upstream logout, post-callback hangs, and any mismatch between the displayed person and the resolved `sub`/uid.
+- Live-test the clear-session flow until ACP Last authorization proves the browser is sent through the intended Authentik invalidation/logout flow before authorization, and the subsequent Authentik UI no longer shows another user's current-session card for new enrollment.
 - Run one final live Authentik pass after rebuilding NodeBB with the current plugin code.
 - Capture actual OIDC claims for an intended unverified-email account and confirm `email_verified === false` is rejected. Use ACP Last failure diagnostics after the rejected callback; inspect provider-side token/userinfo only as needed.
 - Retest post-callback completion after successful repeat login and confirm the browser receives the NodeBB success redirect cleanly.
@@ -42,6 +45,7 @@
 
 ## Release Blockers
 
+- Resolve and document the avatar/session contamination issue. The plugin already scrubs profile fields on brand-new NodeBB SSO-created users, but the live Authentik enrollment UI is still showing a previous/current session avatar. Release is blocked until the flow either reliably clears session state or clearly proves the displayed avatar belongs to the exact verified-email-linked NodeBB account.
 - Verify both username-collision ACP policies live: `unique` should create a safe unique NodeBB username, and `reject` should fail new SSO account creation without creating a user or mapping.
 - Capture actual OIDC claims for an Authentik account intended to be unverified. The live test is not complete until the emitted `email_verified` claim is confirmed to be boolean `false`.
 - Investigate the post-callback hang seen after repeat login. Confirm whether NodeBB is waiting on a response, redirecting to an interstitial, or completing login with a frontend routing issue.
@@ -66,8 +70,14 @@
 
 ## Avatar Investigation
 
+- Priority: P0 release blocker. The issue is not cosmetic; it indicates possible account/session context confusion. Investigate it as a potential account-misdirection attack vector and UX trust failure.
+- Expected behavior:
+  - Brand-new Authentik enrollment with no verified-email match: show no NodeBB account avatar and create a clean NodeBB user only after verified claims resolve safely.
+  - Authentik enrollment/login that verified-email-links to an existing NodeBB account: preserving and displaying that existing NodeBB account's avatar is acceptable because the selected uid is the linked account.
+  - Existing `sub` login: continue to resolve by `sub`; do not use a displayed avatar, username, or browser-session card as identity evidence.
 - Added default fresh-provider-login authorization parameters to reduce Authentik browser-session reuse during enrollment and linking.
 - Added a regression test confirming new SSO-created users do not inherit `picture`, `uploadedpicture`, `icon:text`, or `icon:bgColor` from an existing NodeBB account.
+- Added clear-session controls and Last authorization diagnostics. Continue testing Authentik's invalidation/logout flow override because the OIDC end-session endpoint has been observed routing into enrollment without clearing the displayed current-session avatar.
 - Reproduce the "new Authentik user receives existing NodeBB avatar" issue with a clean incognito session and browser devtools network log.
 - Capture the resolved NodeBB uid, Authentik `sub`, `picture` claim, NodeBB `picture` field, and any OAuth/avatar-related request URLs immediately after account creation.
 - Verify whether the avatar shown is coming from NodeBB user data, a cached browser image, Authentik's account-selection UI, or theme-level rendering.
@@ -77,6 +87,9 @@
 
 ## Account Synchronization
 
+- After the session/avatar contamination issue is resolved, abstract profile synchronization so profile fields can have explicit source-of-truth direction. In particular, support NodeBB as the source of truth for avatars and synchronize the selected NodeBB account avatar into the linked Authentik user.
+- NodeBB-to-Authentik avatar sync must run only after identity resolution has selected a uid by existing `sub` or verified-email link. It must never run from a browser-supplied uid, displayed avatar, username, email alone, or unresolved enrollment session.
+- NodeBB-to-Authentik avatar sync will require explicit Authentik management API configuration, least-privilege token storage, safe image URL/upload handling, dry-run preview, per-user sync audit fields, and clear failure behavior that does not alter identity mappings.
 - Add admin settings for Authentik-as-source-of-truth synchronization:
   - Email sync: update NodeBB email only when provider `email_verified === true`.
   - Username sync: update NodeBB username from `preferred_username` only if enabled and conflict policy passes.

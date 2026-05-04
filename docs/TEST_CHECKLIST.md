@@ -86,7 +86,10 @@ Troubleshooting:
 
 - Rebuild and restart NodeBB after plugin code changes.
 - Re-run ACP discovery and save settings after issuer-handling changes.
-- Test in a clean/incognito browser so Authentik and NodeBB sessions do not hide account-selection behavior.
+- Test in both a clean/incognito browser and a browser with an active different Authentik/NodeBB session so session-contamination behavior is visible.
+- For brand-new Authentik enrollment with no verified-email match, confirm Authentik does not show another user's NodeBB avatar/current-session profile and NodeBB creates a clean user only after verified claims resolve safely.
+- For verified-email linking to an existing NodeBB account, confirm preserving/showing that existing NodeBB account's avatar is acceptable and that the resolved uid is exactly the account whose verified email matched.
+- Use ACP Last authorization after each session-contamination test and record whether the plugin used direct authorization, OIDC end-session, or an Authentik invalidation/logout flow override.
 - Capture the Authentik `sub`, email, `email_verified`, and preferred username for each live test account.
 - Confirm the NodeBB database has subject mappings for the successful login: `authentik:sub:uid` contains the `sub`, the direct `authentik:sub:<sub>` key points to the same uid, and the target user has `authentikSub`, `authentikIssuer`, `authentikLinkedAt`, and `authentikLastLoginAt`.
 - Confirm repeated login with the same Authentik account returns to the same NodeBB uid and does not create another account.
@@ -115,7 +118,7 @@ Troubleshooting:
 - 2026-05-03: Authentik-only user `TestVicky4` hit `Username already taken` during NodeBB account creation. Added create-time username retry handling because NodeBB rejects by slug/creation validation, not only exact username lookup.
 - 2026-05-03: Registering through Authentik with a new username `TestVicky5` but an email already linked to a different Authentik subject allowed Authentik email verification to complete, then NodeBB rejected with `Existing account is linked to a different OIDC subject`. This is correct fail-closed plugin behavior after the provider returns claims; preventing the Authentik-side verification step requires Authentik flow/policy configuration.
 - 2026-05-03: Existing NodeBB-only user `TestVicky6` plus Authentik registration using the same username but different email created a new NodeBB user named `TestVicky6 0`. This is safe from an identity-takeover perspective because username is not used for identity, but product behavior may need a stricter policy option to block new SSO account creation when `preferred_username` collides with an existing NodeBB username.
-- 2026-05-03: During the `TestVicky6` flow, the Authentik UI showed the original `archvillainette` avatar before email verification. Treat as an Authentik/session-selection issue to investigate. Possible mitigation is adding an authorization request option such as `prompt=login` or configuring Authentik account selection flows.
+- 2026-05-03: During the `TestVicky6` flow, the Authentik UI showed the original `archvillainette` avatar before email verification. Treat as a top-priority session/profile contamination issue, not a cosmetic bug. It may indicate backend/account-selection context confusion and can undermine user trust or create an account-misdirection attack surface.
 - 2026-05-03: Setting Authentik custom attributes to `email_verified: false` did not cause NodeBB rejection; login passed and NodeBB marked the email verified. This likely means Authentik still emitted OIDC `email_verified: true` or did not map the custom attribute into the actual claim. Add claim-inspection tooling or Authentik claim policy validation before considering the unverified-email live test passed.
 - 2026-05-03: Authentik user with no email was rejected by NodeBB with `OIDC email is required`; no NodeBB user was created.
 - 2026-05-03: Repeat login for linked `archvillainette` did not create a new NodeBB account. The browser appeared to hang after provider flows, but the NodeBB session was established successfully.
@@ -124,9 +127,10 @@ Troubleshooting:
 
 ## Open Live Items
 
+- P0: Resolve session/avatar contamination. Confirm the only case where an existing NodeBB avatar appears during Authentik login/enrollment is when verified-email linking resolves to that exact existing NodeBB uid.
 - Retest username collision in both ACP policies: "create a safe unique username" and "reject new SSO account creation".
 - Capture actual OIDC ID token/userinfo claims for the `email_verified: false` scenario. Do not rely on Authentik custom attributes alone.
-- Investigate Authentik account-selection/avatar behavior. Decide whether to add optional `prompt=login`, `prompt=select_account`, or an admin-configurable authorization parameter field.
+- Investigate Authentik account-selection/avatar behavior with the clear-session invalidation-flow override. Capture ACP Last authorization, browser redirect chain, Authentik flow slug, displayed user/avatar, final OIDC `sub`, and resolved NodeBB uid.
 - Investigate post-callback hang after successful login and confirm whether the callback response/redirect chain completes cleanly.
 - Add Authentik-side flow/policy rules to reject registration when username or email already exists in Authentik, and verify they stop registration before Authentik redirects back to NodeBB.
 - Add an Authentik-side cleanup policy or admin runbook for inactive enrollment users whose email verification expires before completion, especially because they reserve usernames and may require manual deletion or recovery.

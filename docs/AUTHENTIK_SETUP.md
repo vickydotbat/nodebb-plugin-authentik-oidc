@@ -100,6 +100,7 @@ Back-channel logout is server-to-server. Front-channel logout and consent revoca
 
 Before release, run these live checks against the intended Authentik provider:
 
+- Top priority: confirm new Authentik enrollment does not show another user's avatar or current-session profile. Treat any mismatch between displayed person, final OIDC `sub`, and resolved NodeBB uid as a release blocker.
 - New verified Authentik account creates exactly one NodeBB account.
 - Repeat login with the same Authentik user resolves the same NodeBB uid by `sub`.
 - Existing NodeBB account with matching verified email links without duplicate creation.
@@ -107,6 +108,7 @@ Before release, run these live checks against the intended Authentik provider:
 - Unverified email emits `email_verified: false` in the actual OIDC claims and is rejected.
 - Duplicate Authentik email and duplicate Authentik username enrollment attempts are blocked by Authentik policy before callback when that is the desired operator policy.
 - `prompt=login` or the chosen Authentik account-selection flow prevents accidental browser-session reuse during testing.
+- Clear-session behavior is verified through ACP Last authorization and the browser redirect chain. If OIDC end-session routes into enrollment without clearing session state, use an Authentik invalidation/logout flow override with `next`.
 - Back-channel logout POSTs a `logout_token` and revokes the mapped NodeBB user's sessions when enabled.
 
 ## References
