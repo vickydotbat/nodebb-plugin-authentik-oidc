@@ -54,7 +54,7 @@ Covered baseline cases:
 - Re-run ACP discovery and save settings after issuer-handling changes.
 - Test in a clean/incognito browser so Authentik and NodeBB sessions do not hide account-selection behavior.
 - Capture the Authentik `sub`, email, `email_verified`, and preferred username for each live test account.
-- Confirm the NodeBB database has one mapping for the successful login: `authentik:sub:uid` contains the `sub` and the target user has `authentikSub`, `authentikIssuer`, `authentikLinkedAt`, and `authentikLastLoginAt`.
+- Confirm the NodeBB database has subject mappings for the successful login: `authentik:sub:uid` contains the `sub`, the direct `authentik:sub:<sub>` key points to the same uid, and the target user has `authentikSub`, `authentikIssuer`, `authentikLinkedAt`, and `authentikLastLoginAt`.
 - Confirm repeated login with the same Authentik account returns to the same NodeBB uid and does not create another account.
 - Confirm an Authentik email change after linking still logs into the originally linked NodeBB account by `sub`.
 - Confirm an existing local NodeBB account with a verified matching email links without duplicate account creation.

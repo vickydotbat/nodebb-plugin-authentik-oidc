@@ -46,6 +46,7 @@ function createMocks() {
 		users: new Map(),
 		emailToUid: new Map(),
 		subToUid: new Map(),
+		directSubToUid: new Map(),
 		sidToUid: new Map(),
 		objects: new Map(),
 		settings: new Map(),
@@ -132,6 +133,9 @@ function createMocks() {
 			if (key === 'authentik:sub:uid') {
 				return state.subToUid.get(field) || null;
 			}
+			if (key.startsWith('authentik:sub:') && field === 'uid') {
+				return state.directSubToUid.get(key.slice('authentik:sub:'.length)) || null;
+			}
 			if (key === 'authentik:sid:uid') {
 				return state.sidToUid.get(field) || null;
 			}
@@ -141,6 +145,10 @@ function createMocks() {
 		async setObjectField(key, field, value) {
 			if (key === 'authentik:sub:uid') {
 				state.subToUid.set(field, parseInt(value, 10));
+				return;
+			}
+			if (key.startsWith('authentik:sub:') && field === 'uid') {
+				state.directSubToUid.set(key.slice('authentik:sub:'.length), parseInt(value, 10));
 				return;
 			}
 			if (key === 'authentik:sid:uid') {
@@ -154,6 +162,9 @@ function createMocks() {
 		async deleteObjectField(key, field) {
 			if (key === 'authentik:sub:uid') {
 				state.subToUid.delete(field);
+			}
+			if (key.startsWith('authentik:sub:') && field === 'uid') {
+				state.directSubToUid.delete(key.slice('authentik:sub:'.length));
 			}
 			if (key === 'authentik:sid:uid') {
 				state.sidToUid.delete(field);

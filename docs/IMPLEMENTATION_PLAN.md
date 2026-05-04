@@ -165,7 +165,8 @@ Inputs:
 
 Storage:
 
-- `authentik:sub:<sub> -> uid`
+- `authentik:sub:<sub>.uid -> uid`
+- `authentik:sub:uid[<sub>] -> uid` for auditable object-field scans and compatibility with the ACP repair tooling
 - `user:<uid>.authentikSub = <sub>`
 - `user:<uid>.authentikIssuer = <issuer>`
 - `user:<uid>.authentikLinkedAt = <ISO timestamp or epoch ms>`
@@ -177,7 +178,7 @@ Storage:
 Resolution steps:
 
 1. Validate `sub`. Reject if missing.
-2. Lookup `subUid = db.getObjectField('authentik:sub:uid', sub)` or equivalent stable key.
+2. Lookup `subUid` from `authentik:sub:uid[<sub>]` and the direct `authentik:sub:<sub>.uid` key. If both exist and disagree, fail safely because the identity mapping storage is inconsistent.
 3. If `subUid` exists:
    - Confirm the NodeBB user still exists.
    - Do not require current email to match the mapped user's email.

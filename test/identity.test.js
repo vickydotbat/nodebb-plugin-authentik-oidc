@@ -32,7 +32,43 @@ test('new verified OIDC user creates one NodeBB user and mapping', async () => {
 		assert.equal(result.uid, 1);
 		assert.equal(mocks.state.users.size, 1);
 		assert.equal(mocks.state.subToUid.get('sub-1'), 1);
+		assert.equal(mocks.state.directSubToUid.get('sub-1'), 1);
 		assert.equal(mocks.state.users.get(1).authentikSub, 'sub-1');
+	} finally {
+		restore();
+	}
+});
+
+test('direct subject key resolves existing linked user for spec-compatible storage', async () => {
+	const mocks = createMocks();
+	mocks.state.users.set(42, {
+		uid: 42,
+		username: 'linked',
+		email: 'person@example.com',
+		authentikSub: 'sub-1',
+	});
+	mocks.state.emailToUid.set('person@example.com', 42);
+	mocks.state.directSubToUid.set('sub-1', 42);
+	const { identity, restore } = loadIdentity(mocks);
+	try {
+		const result = await identity.resolve(verified(), { issuer: 'https://id.example.com' });
+		assert.equal(result.uid, 42);
+		assert.equal(mocks.state.users.size, 1);
+	} finally {
+		restore();
+	}
+});
+
+test('subject mapping storage conflict fails safely', async () => {
+	const mocks = createMocks();
+	mocks.state.subToUid.set('sub-1', 1);
+	mocks.state.directSubToUid.set('sub-1', 2);
+	const { identity, restore } = loadIdentity(mocks);
+	try {
+		await assert.rejects(
+			identity.getUidBySub('sub-1'),
+			/mapping storage is inconsistent/
+		);
 	} finally {
 		restore();
 	}

@@ -71,7 +71,7 @@ NodeBB can only enforce identity rules after Authentik returns OIDC claims. Conf
 
 If testing unverified email behavior, inspect the actual OIDC ID token or userinfo response. Authentik custom attributes do not necessarily change the emitted `email_verified` claim.
 
-Use Identity Mapping Diagnostics in the ACP to audit `authentik:sub:uid` mappings. The repair action only removes stale subject mappings that point to missing NodeBB users and requires confirmation.
+Use Identity Mapping Diagnostics in the ACP to audit subject mappings. The plugin writes both the auditable `authentik:sub:uid` object mapping and the direct `authentik:sub:<sub>` lookup key for compatibility; the repair action only removes stale subject mappings that point to missing NodeBB users and requires confirmation.
 
 Use Last failure in the ACP diagnostics section when an OIDC callback is rejected. It stores only sanitized metadata such as rejection code, claim presence, `email_verified` type/value, issuer metadata, and whether userinfo was used. It does not store raw tokens, authorization codes, full claim payloads, or email addresses.
 
