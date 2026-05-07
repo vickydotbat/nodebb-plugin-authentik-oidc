@@ -2,6 +2,12 @@
 
 ## Prioritized Roadmap
 
+## Standing Delivery Rule
+
+- On every roadmap item, if the work introduces an explicit setting, policy flag, redirect mode, sync mode, or debug/operational lever, expose it in the ACP in the same step.
+- Treat ACP save/load wiring, validation, and test coverage as part of completion for that work item.
+- Do not defer explicit runtime toggles into a later “settings cleanup” pass unless the omission is intentional and documented.
+
 ### P0: Release-Critical Identity Safety
 
 - Top priority: resolve Authentik/NodeBB session and avatar cross-contamination before release. A new Authentik enrollment must never display or inherit another user's profile/avatar. The only acceptable case for showing an existing NodeBB avatar is verified-email linking to that exact existing NodeBB account, after identity checks have selected that uid.

@@ -23,6 +23,15 @@ The repository now contains the first working plugin implementation:
 
 Remaining release work is mostly live verification against the target NodeBB/AuthentiK environment, profile synchronization design, and operator documentation polish.
 
+## Standing Rule: ACP Exposure For Explicit Toggles
+
+Every implementation phase must treat ACP exposure as part of the definition of done for any new explicit setting, policy switch, redirect mode, or debug/operational lever.
+
+- Do not leave hardcoded booleans or runtime behavior flags in code when they are meant to be adjusted during troubleshooting, migration, or live verification.
+- If a setting is declared in `lib/config.js` or introduced as a new runtime behavior switch, add the ACP control, save/load wiring, validation, and tests in the same step.
+- If a lever is intentionally not exposed in the ACP, document the reason in code or docs so the omission is deliberate and reviewable.
+- Apply this rule continuously, not as a later ACP cleanup phase.
+
 ## Confirmed NodeBB Conventions
 
 Current NodeBB plugin documentation confirms these conventions:
@@ -476,6 +485,7 @@ Manual integration tests should cover:
 - Confirm user creation, email lookup, email confirmation, and custom field APIs.
 - Add `package.json`, `plugin.json`, `library.js`, and empty admin page.
 - Add lint/test scripts that can run outside a full NodeBB instance where possible.
+- Record any explicit settings or debug levers discovered in this phase and plan ACP exposure immediately instead of leaving them implicit.
 
 ### Phase 2: Configuration And Admin UI
 
@@ -485,6 +495,7 @@ Manual integration tests should cover:
 - Implement field validation.
 - Implement OIDC discovery.
 - Add admin tests or fixtures.
+- Establish and follow the ongoing rule for later phases: when new runtime toggles are introduced, extend the ACP in the same change rather than deferring them.
 
 ### Phase 3: OIDC Flow
 

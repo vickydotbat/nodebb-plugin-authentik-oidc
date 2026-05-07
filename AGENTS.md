@@ -76,6 +76,7 @@ Admin UI requirements:
 - Support OIDC discovery from issuer if practical.
 - Do not expose saved client secret unnecessarily.
 - Include clear validation errors.
+- Any explicitly declared setting or debug-oriented runtime lever added during implementation must be exposed in the ACP unless there is a documented security reason not to. Do not leave hardcoded operational toggles hidden in code.
 
 Security requirements:
 - Validate state.
@@ -120,6 +121,7 @@ Phase 1:
 - Identify current conventions for login route registration and admin UI.
 - Decide whether to use passport-openidconnect, openid-client, or direct OAuth/OIDC implementation.
 - Prefer a small dependency surface.
+- For every phase, if a new explicit setting or debug/operational toggle is introduced, fold it into the ACP in the same phase instead of deferring it.
 
 Phase 2:
 - Build minimal working login flow.
