@@ -105,6 +105,21 @@ test('fresh provider login setting defaults on and can be disabled', async () =>
 	}
 });
 
+test('register redirect setting defaults on and can be disabled', async () => {
+	const mocks = createMocks();
+	const { config, restore } = loadConfig(mocks);
+	try {
+		assert.equal((await config.getSettings()).redirectRegisterToLogin, true);
+		const saved = await config.saveSettings({
+			redirectRegisterToLogin: false,
+		});
+		assert.equal(saved.redirectRegisterToLogin, false);
+		assert.equal((await config.getSettings()).redirectRegisterToLogin, false);
+	} finally {
+		restore();
+	}
+});
+
 test('clear provider session setting requires an end-session or custom clear endpoint when enabled', async () => {
 	const mocks = createMocks();
 	const { config, restore } = loadConfig(mocks);

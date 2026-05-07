@@ -1,0 +1,158 @@
+'use strict';
+
+const test = require('node:test');
+const assert = require('node:assert/strict');
+
+const { createMocks, installNodebbMocks } = require('./bootstrap');
+
+function loadRouting(mocks) {
+	const restore = installNodebbMocks(mocks);
+	delete require.cache[require.resolve('../lib/logger')];
+	delete require.cache[require.resolve('../lib/config')];
+	delete require.cache[require.resolve('../lib/routing')];
+	const routing = require('../lib/routing');
+	return { routing, restore };
+}
+
+test('anonymous register route redirects to oidc login when plugin is enabled', async () => {
+	const mocks = createMocks();
+	mocks.meta.config = {};
+	mocks.state.settings.set('authentik-oidc', {
+		enabled: true,
+	});
+	const { routing, restore } = loadRouting(mocks);
+	try {
+		let redirectedTo = '';
+		let nextCalled = false;
+		await routing.handleRegisterRoute({
+			loggedIn: false,
+			uid: 0,
+			query: {},
+			headers: {},
+		}, {
+			redirect(url) {
+				redirectedTo = url;
+			},
+		}, () => {
+			nextCalled = true;
+		});
+
+		assert.equal(nextCalled, false);
+		assert.equal(redirectedTo, 'https://forum.example.com/auth/authentik');
+	} finally {
+		restore();
+	}
+});
+
+test('anonymous register redirect preserves requested next target', async () => {
+	const mocks = createMocks();
+	mocks.meta.config = {};
+	mocks.state.settings.set('authentik-oidc', {
+		enabled: true,
+	});
+	const { routing, restore } = loadRouting(mocks);
+	try {
+		let redirectedTo = '';
+		await routing.handleRegisterRoute({
+			loggedIn: false,
+			uid: 0,
+			query: {},
+			headers: {
+				'x-return-to': '/topic/123/example',
+			},
+		}, {
+			redirect(url) {
+				redirectedTo = url;
+			},
+		}, () => {});
+
+		const url = new URL(redirectedTo);
+		assert.equal(url.pathname, '/auth/authentik');
+		assert.equal(url.searchParams.get('next'), '/topic/123/example');
+	} finally {
+		restore();
+	}
+});
+
+test('register route allows explicit local and invite-based registration flows', async () => {
+	const mocks = createMocks();
+	mocks.meta.config = {};
+	mocks.state.settings.set('authentik-oidc', {
+		enabled: true,
+	});
+	const { routing, restore } = loadRouting(mocks);
+	try {
+		for (const query of [{ local: '1' }, { token: 'invite-token' }]) {
+			let nextCalled = false;
+			let redirected = false;
+			await routing.handleRegisterRoute({
+				loggedIn: false,
+				uid: 0,
+				query,
+				headers: {},
+			}, {
+				redirect() {
+					redirected = true;
+				},
+			}, () => {
+				nextCalled = true;
+			});
+			assert.equal(nextCalled, true);
+			assert.equal(redirected, false);
+		}
+	} finally {
+		restore();
+	}
+});
+
+test('register route does not redirect when plugin is disabled', async () => {
+	const mocks = createMocks();
+	mocks.meta.config = {};
+	const { routing, restore } = loadRouting(mocks);
+	try {
+		let nextCalled = false;
+		await routing.handleRegisterRoute({
+			loggedIn: false,
+			uid: 0,
+			query: {},
+			headers: {},
+		}, {
+			redirect() {
+				throw new Error('should not redirect');
+			},
+		}, () => {
+			nextCalled = true;
+		});
+		assert.equal(nextCalled, true);
+	} finally {
+		restore();
+	}
+});
+
+test('register route does not redirect when redirectRegisterToLogin is disabled', async () => {
+	const mocks = createMocks();
+	mocks.meta.config = {};
+	mocks.state.settings.set('authentik-oidc', {
+		enabled: true,
+		redirectRegisterToLogin: false,
+	});
+	const { routing, restore } = loadRouting(mocks);
+	try {
+		let nextCalled = false;
+		await routing.handleRegisterRoute({
+			loggedIn: false,
+			uid: 0,
+			query: {},
+			headers: {},
+		}, {
+			redirect() {
+				throw new Error('should not redirect');
+			},
+		}, () => {
+			nextCalled = true;
+		});
+		assert.equal(nextCalled, true);
+	} finally {
+		restore();
+	}
+});
