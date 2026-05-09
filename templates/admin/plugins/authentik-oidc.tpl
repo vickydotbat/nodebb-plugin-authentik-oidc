@@ -191,6 +191,12 @@
 				</div>
 
 				<div class="form-check form-switch mb-3">
+					<input class="form-check-input" type="checkbox" id="redirectLoginToProvider" data-authentik-field="redirectLoginToProvider">
+					<label class="form-check-label" for="redirectLoginToProvider">Redirect anonymous login page to Authentik</label>
+					<div class="form-text">When enabled, unauthenticated <code>/login</code> requests start the OIDC flow. Use <code>/login?local=1</code> for the local NodeBB login form.</div>
+				</div>
+
+				<div class="form-check form-switch mb-3">
 					<input class="form-check-input" type="checkbox" id="syncFullnameOnLogin" data-authentik-field="syncFullnameOnLogin">
 					<label class="form-check-label" for="syncFullnameOnLogin">Sync display name from OIDC name claim</label>
 					<div class="form-text">When enabled, successful SSO logins update NodeBB fullname from the provider after identity resolution succeeds. Reserved staff/system names are skipped for non-privileged users.</div>

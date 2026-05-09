@@ -10,6 +10,7 @@ Create an Authentik OAuth2/OpenID provider for NodeBB:
 
 - Client type: confidential.
 - Redirect URI: the callback URL shown in the NodeBB plugin ACP page.
+- Launch URL: the NodeBB OIDC start URL, for example `https://forum.example.com/auth/authentik`.
 - Scopes: `openid email profile`.
 - Subject mode: stable per-user subject. Do not use username or email as the subject.
 - Signing key: configured and exposed through the provider JWKS URI.
@@ -72,6 +73,16 @@ When testing enrollment or linking, Authentik browser sessions can make the wron
 - Build an Authentik authorization flow that makes account selection visible when users commonly share browsers.
 
 Do not work around account-selection confusion by matching NodeBB accounts on username. Username remains display-only.
+
+## Authentik-Primary Login
+
+Logging into Authentik by itself does not create a NodeBB session. NodeBB must start or receive the OIDC authorization-code flow before it can set its own session cookie.
+
+For Authentik-portal launches, set the Authentik application's launch URL to NodeBB's `/auth/authentik` URL. When a user clicks that application in Authentik, the browser starts NodeBB's OIDC flow and returns through the configured callback.
+
+For NodeBB-side login, enable "Redirect anonymous login page to Authentik" in the plugin ACP if `/login` should immediately start OIDC instead of showing the local NodeBB login form. The local form remains reachable at `/login?local=1` for break-glass or migration use.
+
+If the user is already authenticated in Authentik and should pass through without another prompt, disable "Force fresh Authentik login". Keeping that setting enabled sends `prompt=login` and `max_age=0`, which intentionally prevents silent reuse of an existing Authentik browser session.
 
 ## Self-Service Links
 

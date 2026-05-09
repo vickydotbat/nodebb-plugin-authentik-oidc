@@ -120,6 +120,21 @@ test('register redirect setting defaults on and can be disabled', async () => {
 	}
 });
 
+test('login redirect setting defaults off and can be enabled', async () => {
+	const mocks = createMocks();
+	const { config, restore } = loadConfig(mocks);
+	try {
+		assert.equal((await config.getSettings()).redirectLoginToProvider, false);
+		const saved = await config.saveSettings({
+			redirectLoginToProvider: true,
+		});
+		assert.equal(saved.redirectLoginToProvider, true);
+		assert.equal((await config.getSettings()).redirectLoginToProvider, true);
+	} finally {
+		restore();
+	}
+});
+
 test('clear provider session setting requires an end-session or custom clear endpoint when enabled', async () => {
 	const mocks = createMocks();
 	const { config, restore } = loadConfig(mocks);

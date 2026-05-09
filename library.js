@@ -15,6 +15,7 @@ const plugin = module.exports;
 
 plugin.init = async function ({ router, middleware }) {
 	await config.ensureDefaults();
+	router.get('/login', routing.handleLoginRoute);
 	router.get('/register', routing.handleRegisterRoute);
 	router.post('/auth/authentik/backchannel-logout', logout.handleBackchannelLogout);
 	routeHelpers.setupAdminPageRoute(router, '/admin/plugins/authentik-oidc', admin.renderAdminPage);

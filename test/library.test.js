@@ -96,6 +96,39 @@ test('admin mutation API routes include explicit CSRF middleware when NodeBB exp
 	}
 });
 
+test('app init registers login/register intercepts and back-channel logout route', async () => {
+	const mocks = createMocks();
+	const getRoutes = [];
+	const postRoutes = [];
+	const { library, restore } = loadLibrary(mocks);
+	try {
+		await library.init({
+			router: {
+				get(path, handler) {
+					getRoutes.push({ path, handler });
+				},
+				post(path, handler) {
+					postRoutes.push({ path, handler });
+				},
+			},
+			middleware: {
+				exposeUid() {},
+				ensureLoggedIn() {},
+				canViewUsers() {},
+				checkAccountPermissions() {},
+			},
+		});
+
+		assert.deepEqual(getRoutes.map(route => route.path), ['/login', '/register']);
+		assert.deepEqual(postRoutes.map(route => route.path), ['/auth/authentik/backchannel-logout']);
+		assert.equal(typeof getRoutes[0].handler, 'function');
+		assert.equal(typeof getRoutes[1].handler, 'function');
+		assert.equal(typeof postRoutes[0].handler, 'function');
+	} finally {
+		restore();
+	}
+});
+
 test('admin API route middleware rejects users without admin settings privilege', async () => {
 	const mocks = createMocks();
 	const routeCalls = [];

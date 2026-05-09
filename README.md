@@ -53,6 +53,7 @@ Create an Authentik OAuth2/OpenID provider:
 - Flow: authorization code
 - Client type: confidential
 - Redirect URI: the callback URL shown in the plugin ACP page
+- Launch URL: the NodeBB OIDC start URL, for example `https://forum.example.com/auth/authentik`
 - Scopes: `openid email profile`
 - Optional single logout: enable OIDC back-channel logout and set Authentik's back-channel logout URI to the URL shown in the plugin ACP page
 
@@ -69,6 +70,8 @@ prompt=login
 By default, the plugin sends `prompt=login` and `max_age=0` so Authentik enrollment and linking screens do not silently reuse another Authentik browser session. This avoids confusing account-selection screens where a new enrollment can show the avatar for an already-authenticated Authentik account. Disable "Force fresh Authentik login" only if your Authentik flow already makes account selection explicit. The plugin rejects attempts to override protocol-critical parameters such as `state`, `nonce`, `client_id`, `redirect_uri`, and `scope`.
 
 If Authentik still shows a previous user's current-session card or avatar during new enrollment, enable "Clear Authentik session before login". If the discovered OIDC end-session endpoint routes into the enrollment flow instead of clearing the browser session, set "Session clear endpoint override" to an Authentik invalidation/logout flow such as `https://auth.example.com/if/flow/default-invalidation-flow/` and set the return parameter to `next`. With `next`, the plugin returns to Authentik's authorization endpoint directly after session clearing so Authentik does not have to allow an external `next` URL.
+
+If NodeBB should behave as Authentik-primary for sign-in, enable "Redirect anonymous login page to Authentik" in the plugin ACP. Anonymous `/login` requests will start the OIDC flow, while `/login?local=1` remains available for the local NodeBB login form. For launch from the Authentik application portal, configure the Authentik application's launch URL to NodeBB's `/auth/authentik` URL. An existing Authentik browser session only becomes a NodeBB session after the browser is redirected through that OIDC start URL and callback. If you want that portal launch to pass through silently when the user is already authenticated in Authentik, disable "Force fresh Authentik login"; leaving it enabled intentionally asks Authentik to re-authenticate or reselect the account.
 
 ## Operational Notes
 

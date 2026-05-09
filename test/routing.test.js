@@ -44,6 +44,71 @@ test('anonymous register route redirects to oidc login when plugin is enabled', 
 	}
 });
 
+test('anonymous login route redirects to oidc login when configured', async () => {
+	const mocks = createMocks();
+	mocks.meta.config = {};
+	mocks.state.settings.set('authentik-oidc', {
+		enabled: true,
+		redirectLoginToProvider: true,
+	});
+	const { routing, restore } = loadRouting(mocks);
+	try {
+		let redirectedTo = '';
+		let nextCalled = false;
+		await routing.handleLoginRoute({
+			loggedIn: false,
+			uid: 0,
+			query: {},
+			headers: {
+				'x-return-to': '/unread',
+			},
+		}, {
+			redirect(url) {
+				redirectedTo = url;
+			},
+		}, () => {
+			nextCalled = true;
+		});
+
+		const url = new URL(redirectedTo);
+		assert.equal(nextCalled, false);
+		assert.equal(url.pathname, '/auth/authentik');
+		assert.equal(url.searchParams.get('next'), '/unread');
+	} finally {
+		restore();
+	}
+});
+
+test('login route stays local by default', async () => {
+	const mocks = createMocks();
+	mocks.meta.config = {};
+	mocks.state.settings.set('authentik-oidc', {
+		enabled: true,
+	});
+	const { routing, restore } = loadRouting(mocks);
+	try {
+		let nextCalled = false;
+		let redirected = false;
+		await routing.handleLoginRoute({
+			loggedIn: false,
+			uid: 0,
+			query: {},
+			headers: {},
+		}, {
+			redirect() {
+				redirected = true;
+			},
+		}, () => {
+			nextCalled = true;
+		});
+
+		assert.equal(nextCalled, true);
+		assert.equal(redirected, false);
+	} finally {
+		restore();
+	}
+});
+
 test('anonymous register redirect preserves requested next target', async () => {
 	const mocks = createMocks();
 	mocks.meta.config = {};
