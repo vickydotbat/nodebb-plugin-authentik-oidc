@@ -27,7 +27,7 @@ NodeBB login requires these OIDC claims:
 - `preferred_username`: optional, display-only seed for new NodeBB usernames.
 - `name`: optional, used only when display-name sync is enabled.
 
-Do not map `preferred_username`, username, slug, display name, or email into identity authority. The plugin uses only `sub` as the durable external identity and verified email as a secondary first-link mechanism.
+Do not map `preferred_username`, username, slug, display name, or email into identity authority. The plugin uses exact `issuer + sub` as the durable external identity. Verified email can be used only under an explicit trusted migration policy, not as the default account-binding mechanism.
 
 ## Email Verification Claim
 
@@ -56,7 +56,7 @@ Use Authentik enrollment and policy configuration to reject bad registrations be
 - Avoid silently changing email, username, or profile fields during enrollment in ways the user cannot review.
 - Keep NodeBB as the relying party only; do not use the NodeBB plugin to collect old NodeBB passwords or create Authentik users through a generic browser form.
 
-The plugin will still fail closed if a verified email maps to a NodeBB account that is already linked to another Authentik `sub`, but by then the Authentik-side registration may already have completed. Authentik policies are the right place to stop that earlier.
+The plugin will not silently bind a new Authentik subject to an existing local NodeBB account by email under the default policy. If the trusted verified-email auto-link policy is enabled for migration, the plugin still fails closed when a verified email maps to a NodeBB account already linked to another Authentik subject, but by then the Authentik-side registration may already have completed. Authentik policies are the right place to stop that earlier.
 
 ## Account Selection And Session Reuse
 
@@ -67,7 +67,7 @@ When testing enrollment or linking, Authentik browser sessions can make the wron
 - If Authentik still shows the previous user's current-session card or avatar, enable the plugin ACP "Clear Authentik session before login" setting and populate the discovered end-session endpoint.
 - If the OIDC end-session endpoint routes into the enrollment flow instead of clearing the browser session, set "Session clear endpoint override" to an Authentik invalidation/logout flow, for example `https://auth.example.com/if/flow/default-invalidation-flow/`, and set "Session clear return parameter" to `next`. The plugin will send `next` to Authentik's own authorization URL, not to an external NodeBB URL.
 - If Authentik rewrites that `next` target to `/` or still shows the previous user's avatar, inspect the Authentik invalidation and enrollment flows directly. Confirm the invalidation flow has a logout/session-invalidation stage, confirm flow `next` URL restrictions, and consider a dedicated NodeBB preflight logout flow instead of the default invalidation flow.
-- If Authentik requires explicit post-logout redirect registration, allow the plugin login URL with `?authentikFreshLogin=1`.
+- If Authentik requires explicit post-logout redirect registration, allow the plugin login URL shown in the ACP. The plugin no longer uses a public query flag as proof that session clearing happened.
 - Use `prompt=select_account` only if your Authentik version and flow support the expected account-selection behavior.
 - Build an Authentik authorization flow that makes account selection visible when users commonly share browsers.
 
@@ -104,7 +104,8 @@ Before release, run these live checks against the intended Authentik provider:
 - Top priority: confirm new Authentik enrollment does not show another user's avatar or current-session profile. Treat any mismatch between displayed person, final OIDC `sub`, and resolved NodeBB uid as a release blocker.
 - New verified Authentik account creates exactly one NodeBB account.
 - Repeat login with the same Authentik user resolves the same NodeBB uid by `sub`.
-- Existing NodeBB account with matching verified email links without duplicate creation.
+- Existing NodeBB account with matching verified email does not auto-link under the default policy.
+- Trusted verified-email auto-linking, if enabled for migration, links only after the reviewed policy is active.
 - Missing email is rejected without user or mapping creation.
 - Unverified email emits `email_verified: false` in the actual OIDC claims and is rejected.
 - Duplicate Authentik email and duplicate Authentik username enrollment attempts are blocked by Authentik policy before callback when that is the desired operator policy.

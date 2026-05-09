@@ -4,12 +4,29 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const Module = require('node:module');
 const crypto = require('node:crypto');
+const jose = require('jose');
 
 function loadOidc() {
 	const originalLoad = Module._load;
 	Module._load = function (request, parent, isMain) {
-		if (request === 'jsonwebtoken') {
-			return {};
+		return originalLoad.call(this, request, parent, isMain);
+	};
+	delete require.cache[require.resolve('../lib/oidc')];
+	const oidc = require('../lib/oidc');
+	return {
+		oidc,
+		restore() {
+			Module._load = originalLoad;
+			delete require.cache[require.resolve('../lib/oidc')];
+		},
+	};
+}
+
+function loadOidcWithOpenIdClient(openidClient) {
+	const originalLoad = Module._load;
+	Module._load = function (request, parent, isMain) {
+		if (request === 'openid-client') {
+			return openidClient;
 		}
 		return originalLoad.call(this, request, parent, isMain);
 	};
@@ -27,9 +44,6 @@ function loadOidc() {
 function loadOidcWithJwks(keys) {
 	const originalLoad = Module._load;
 	Module._load = function (request, parent, isMain) {
-		if (request === 'jsonwebtoken') {
-			return {};
-		}
 		if (request === './http' && parent && parent.filename.endsWith('/lib/oidc.js')) {
 			return {
 				async requestJson() {
@@ -50,23 +64,19 @@ function loadOidcWithJwks(keys) {
 	};
 }
 
-function loadOidcForIdToken({ header, keys, claims }) {
+function loadOidcWithRealJwt({ jwksResponses, safeRequestUrl } = {}) {
 	const originalLoad = Module._load;
+	const responses = [...(jwksResponses || [])];
 	Module._load = function (request, parent, isMain) {
-		if (request === 'jsonwebtoken') {
-			return {
-				decode() {
-					return { header };
-				},
-				verify() {
-					return claims || { sub: 'sub-1', nonce: 'nonce-1' };
-				},
-			};
-		}
 		if (request === './http' && parent && parent.filename.endsWith('/lib/oidc.js')) {
 			return {
 				async requestJson() {
-					return { keys };
+					return responses.shift() || jwksResponses[jwksResponses.length - 1];
+				},
+				async safeRequestUrl(url) {
+					if (safeRequestUrl) {
+						return await safeRequestUrl(url);
+					}
 				},
 			};
 		}
@@ -83,45 +93,33 @@ function loadOidcForIdToken({ header, keys, claims }) {
 	};
 }
 
-function oidcHash(value, algorithm = 'RS256') {
-	const digestAlgorithm = algorithm.includes('384') ? 'sha384' :
-		algorithm.includes('512') ? 'sha512' :
-			'sha256';
-	const digest = crypto.createHash(digestAlgorithm).update(value).digest();
-	return digest.subarray(0, digest.length / 2).toString('base64url');
+function rsaKeyPair(kid = 'rsa-1') {
+	const { privateKey, publicKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
+	const jwk = publicKey.export({ format: 'jwk' });
+	jwk.kid = kid;
+	jwk.use = 'sig';
+	jwk.alg = 'RS256';
+	return { privateKey, jwk, kid };
 }
 
-function loadOidcForLogoutToken({ header, keys, claims }) {
-	const originalLoad = Module._load;
-	Module._load = function (request, parent, isMain) {
-		if (request === 'jsonwebtoken') {
-			return {
-				decode() {
-					return { header };
-				},
-				verify() {
-					return claims;
-				},
-			};
-		}
-		if (request === './http' && parent && parent.filename.endsWith('/lib/oidc.js')) {
-			return {
-				async requestJson() {
-					return { keys };
-				},
-			};
-		}
-		return originalLoad.call(this, request, parent, isMain);
-	};
-	delete require.cache[require.resolve('../lib/oidc')];
-	const oidc = require('../lib/oidc');
-	return {
-		oidc,
-		restore() {
-			Module._load = originalLoad;
-			delete require.cache[require.resolve('../lib/oidc')];
-		},
-	};
+function signToken(privateKey, kid, claims, options = {}) {
+	const alg = options.algorithm || 'RS256';
+	return new jose.SignJWT(claims)
+		.setProtectedHeader({ alg, kid })
+		.sign(privateKey);
+}
+
+async function withJwksFetch(jwks, callback) {
+	const originalFetch = global.fetch;
+	global.fetch = async () => new Response(JSON.stringify(jwks), {
+		status: 200,
+		headers: { 'content-type': 'application/json' },
+	});
+	try {
+		return await callback();
+	} finally {
+		global.fetch = originalFetch;
+	}
 }
 
 function settings(overrides = {}) {
@@ -191,10 +189,10 @@ test('provider logout URL returns to the plugin login route', () => {
 	try {
 		const url = new URL(oidc.providerLogoutUrl(
 			{ endSessionEndpoint: 'https://auth.example.com/application/o/nodebb/end-session/' },
-			'https://forum.example.com/auth/authentik?authentikFreshLogin=1'
+			'https://forum.example.com/auth/authentik'
 		));
 		assert.equal(url.href.startsWith('https://auth.example.com/application/o/nodebb/end-session/'), true);
-		assert.equal(url.searchParams.get('post_logout_redirect_uri'), 'https://forum.example.com/auth/authentik?authentikFreshLogin=1');
+		assert.equal(url.searchParams.get('post_logout_redirect_uri'), 'https://forum.example.com/auth/authentik');
 	} finally {
 		restore();
 	}
@@ -208,10 +206,10 @@ test('provider logout URL can use an Authentik flow with next return parameter',
 				sessionClearEndpoint: 'https://auth.example.com/if/flow/default-invalidation-flow/',
 				sessionClearReturnParameter: 'next',
 			},
-			'https://forum.example.com/auth/authentik?authentikFreshLogin=1'
+			'https://forum.example.com/auth/authentik'
 		));
 		assert.equal(url.href.startsWith('https://auth.example.com/if/flow/default-invalidation-flow/'), true);
-		assert.equal(url.searchParams.get('next'), 'https://forum.example.com/auth/authentik?authentikFreshLogin=1');
+		assert.equal(url.searchParams.get('next'), 'https://forum.example.com/auth/authentik');
 	} finally {
 		restore();
 	}
@@ -229,10 +227,10 @@ test('provider relative URL keeps same-origin authorization returns inside Authe
 		);
 		assert.equal(
 			oidc.providerRelativeUrl(
-				'https://forum.example.com/auth/authentik?authentikFreshLogin=1',
+				'https://forum.example.com/auth/authentik',
 				'https://auth.example.com/if/flow/default-invalidation-flow/'
 			),
-			'https://forum.example.com/auth/authentik?authentikFreshLogin=1'
+			'https://forum.example.com/auth/authentik'
 		);
 	} finally {
 		restore();
@@ -275,6 +273,174 @@ test('authorization URL rejects attempts to override plugin-controlled parameter
 	}
 });
 
+test('safe fetch disables automatic redirects', async () => {
+	const seen = [];
+	const originalFetch = global.fetch;
+	global.fetch = async (input, init) => {
+		seen.push({ input, init });
+		return new Response('{}', { status: 200 });
+	};
+	const { oidc, restore } = loadOidcWithRealJwt({
+		jwksResponses: [{ keys: [] }],
+		safeRequestUrl: async (url) => {
+			seen.push({ safeUrl: url });
+		},
+	});
+	try {
+		await oidc.safeFetch('https://auth.example.com/token', { method: 'POST' });
+		assert.equal(seen[0].safeUrl, 'https://auth.example.com/token');
+		assert.equal(seen[1].init.redirect, 'manual');
+	} finally {
+		global.fetch = originalFetch;
+		restore();
+	}
+});
+
+test('safe fetch rejects redirect responses instead of following them', async () => {
+	const originalFetch = global.fetch;
+	global.fetch = async () => new Response('', {
+		status: 302,
+		headers: { location: 'http://127.0.0.1/internal' },
+	});
+	const { oidc, restore } = loadOidcWithRealJwt({
+		jwksResponses: [{ keys: [] }],
+	});
+	try {
+		await assert.rejects(
+			oidc.safeFetch('https://auth.example.com/token', { method: 'POST' }),
+			/redirect/
+		);
+	} finally {
+		global.fetch = originalFetch;
+		restore();
+	}
+});
+
+test('authorization code grant asks openid-client to validate state, nonce, PKCE, ID token, and max age', async () => {
+	let grantCall = null;
+	const openidClient = {
+		customFetch: Symbol('customFetch'),
+		Configuration: class Configuration {
+			constructor(server, clientId, metadata, auth) {
+				this.server = server;
+				this.clientId = clientId;
+				this.metadata = metadata;
+				this.auth = auth;
+			}
+		},
+		ClientSecretBasic(secret) {
+			return { method: 'basic', secret };
+		},
+		ClientSecretPost(secret) {
+			return { method: 'post', secret };
+		},
+		None() {
+			return { method: 'none' };
+		},
+		async authorizationCodeGrant(config, currentUrl, checks) {
+			grantCall = { config, currentUrl, checks };
+			return {
+				access_token: 'access-token',
+				id_token: 'id-token',
+				claims() {
+					return { sub: 'sub-1' };
+				},
+			};
+		},
+		buildAuthorizationUrl() {
+			return new URL('https://auth.example.com/authorize');
+		},
+		async fetchUserInfo() {
+			return {};
+		},
+	};
+	const { oidc, restore } = loadOidcWithOpenIdClient(openidClient);
+	try {
+		await oidc.exchangeCode({
+			issuer: 'https://auth.example.com/application/o/nodebb/',
+			authorizationEndpoint: 'https://auth.example.com/authorize',
+			tokenEndpoint: 'https://auth.example.com/token',
+			userinfoEndpoint: 'https://auth.example.com/userinfo',
+			jwksUri: 'https://auth.example.com/jwks',
+			clientId: 'nodebb',
+			clientSecret: 'secret',
+			tokenEndpointAuthMethod: 'client_secret_basic',
+			idTokenSigningAlg: 'RS256',
+			forceProviderLogin: true,
+		}, 'code-1', {
+			state: 'state-1',
+			nonce: 'nonce-1',
+			codeVerifier: 'verifier-1',
+		}, 'https://forum.example.com/auth/authentik/callback');
+
+		assert.equal(grantCall.currentUrl.searchParams.get('code'), 'code-1');
+		assert.equal(grantCall.currentUrl.searchParams.get('state'), 'state-1');
+		assert.equal(grantCall.config.metadata.id_token_signed_response_alg, 'RS256');
+		assert.deepEqual(grantCall.checks, {
+			expectedState: 'state-1',
+			expectedNonce: 'nonce-1',
+			idTokenExpected: true,
+			maxAge: 0,
+			pkceCodeVerifier: 'verifier-1',
+		});
+	} finally {
+		restore();
+	}
+});
+
+test('processed token set claims are required for the openid-client login path', () => {
+	const { oidc, restore } = loadOidc();
+	try {
+		assert.throws(
+			() => oidc.claimsFromTokenSet({}, { access_token: 'access-token', id_token: 'id-token' }, { nonce: 'nonce-1' }),
+			/validated ID token claims/
+		);
+	} finally {
+		restore();
+	}
+});
+
+test('processed token set claims still receive plugin freshness and nonce checks', () => {
+	const { oidc, restore } = loadOidc();
+	const now = Math.floor(Date.now() / 1000);
+	try {
+		assert.throws(
+			() => oidc.claimsFromTokenSet({
+				clientId: 'nodebb',
+				forceProviderLogin: true,
+			}, {
+				claims() {
+					return {
+						sub: 'sub-1',
+						exp: now + 300,
+						iat: now,
+						nonce: 'nonce-1',
+					};
+				},
+			}, { nonce: 'nonce-1' }),
+			/auth_time/
+		);
+		assert.throws(
+			() => oidc.claimsFromTokenSet({
+				clientId: 'nodebb',
+				forceProviderLogin: false,
+			}, {
+				claims() {
+					return {
+						sub: 'sub-1',
+						exp: now + 300,
+						iat: now,
+						nonce: 'other-nonce',
+					};
+				},
+			}, { nonce: 'nonce-1' }),
+			/nonce/
+		);
+	} finally {
+		restore();
+	}
+});
+
 test('JWKS test reports sanitized supported signing key metadata', async () => {
 	const { oidc, restore } = loadOidcWithJwks([
 		{ kty: 'RSA', use: 'sig', kid: 'rsa-1', alg: 'RS256', n: 'redacted', e: 'AQAB' },
@@ -304,236 +470,6 @@ test('JWKS test fails when no supported signing keys are available', async () =>
 			oidc.testJwks('https://auth.example.com/jwks/'),
 			/JWKS did not include supported signing keys/
 		);
-	} finally {
-		restore();
-	}
-});
-
-test('ID token verification rejects unsupported algorithms before key selection', async () => {
-	const { oidc, restore } = loadOidcForIdToken({
-		header: { alg: 'HS256', kid: 'shared-secret' },
-		keys: [{ kty: 'oct', kid: 'shared-secret' }],
-	});
-	try {
-		await assert.rejects(
-			oidc.verifyIdToken({
-				jwksUri: 'https://auth.example.com/jwks/',
-				clientId: 'nodebb',
-				issuer: 'https://auth.example.com/application/o/nodebb/',
-			}, 'token', 'nonce-1'),
-			/unsupported signing algorithm/
-		);
-	} finally {
-		restore();
-	}
-});
-
-test('ID token verification ignores non-signing keys with matching kid', async () => {
-	const { publicKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
-	const signingJwk = publicKey.export({ format: 'jwk' });
-	signingJwk.kid = 'signing-key';
-	signingJwk.use = 'sig';
-	signingJwk.alg = 'RS256';
-
-	const { oidc, restore } = loadOidcForIdToken({
-		header: { alg: 'RS256', kid: 'enc-key' },
-		keys: [
-			{ ...signingJwk, kid: 'enc-key', use: 'enc' },
-			signingJwk,
-		],
-	});
-	try {
-		await assert.rejects(
-			oidc.verifyIdToken({
-				jwksUri: 'https://auth.example.com/jwks/',
-				clientId: 'nodebb',
-				issuer: 'https://auth.example.com/application/o/nodebb/',
-			}, 'token', 'nonce-1'),
-			/Unable to find OIDC signing key/
-		);
-	} finally {
-		restore();
-	}
-});
-
-test('ID token verification rejects multi-audience token without matching authorized party', async () => {
-	const { publicKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
-	const signingJwk = publicKey.export({ format: 'jwk' });
-	signingJwk.kid = 'signing-key';
-	signingJwk.use = 'sig';
-	signingJwk.alg = 'RS256';
-
-	const { oidc, restore } = loadOidcForIdToken({
-		header: { alg: 'RS256', kid: 'signing-key' },
-		keys: [signingJwk],
-		claims: {
-			sub: 'sub-1',
-			nonce: 'nonce-1',
-			aud: ['nodebb', 'other-client'],
-			azp: 'other-client',
-		},
-	});
-	try {
-		await assert.rejects(
-			oidc.verifyIdToken({
-				jwksUri: 'https://auth.example.com/jwks/',
-				clientId: 'nodebb',
-				issuer: 'https://auth.example.com/application/o/nodebb/',
-			}, 'token', 'nonce-1'),
-			/authorized party/
-		);
-	} finally {
-		restore();
-	}
-});
-
-test('ID token verification rejects single-audience token with mismatched authorized party', async () => {
-	const { publicKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
-	const signingJwk = publicKey.export({ format: 'jwk' });
-	signingJwk.kid = 'signing-key';
-	signingJwk.use = 'sig';
-	signingJwk.alg = 'RS256';
-
-	const { oidc, restore } = loadOidcForIdToken({
-		header: { alg: 'RS256', kid: 'signing-key' },
-		keys: [signingJwk],
-		claims: {
-			sub: 'sub-1',
-			nonce: 'nonce-1',
-			aud: 'nodebb',
-			azp: 'other-client',
-		},
-	});
-	try {
-		await assert.rejects(
-			oidc.verifyIdToken({
-				jwksUri: 'https://auth.example.com/jwks/',
-				clientId: 'nodebb',
-				issuer: 'https://auth.example.com/application/o/nodebb/',
-			}, 'token', 'nonce-1'),
-			/authorized party/
-		);
-	} finally {
-		restore();
-	}
-});
-
-test('ID token verification accepts multi-audience token with matching authorized party', async () => {
-	const { publicKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
-	const signingJwk = publicKey.export({ format: 'jwk' });
-	signingJwk.kid = 'signing-key';
-	signingJwk.use = 'sig';
-	signingJwk.alg = 'RS256';
-
-	const { oidc, restore } = loadOidcForIdToken({
-		header: { alg: 'RS256', kid: 'signing-key' },
-		keys: [signingJwk],
-		claims: {
-			sub: 'sub-1',
-			nonce: 'nonce-1',
-			aud: ['nodebb', 'other-client'],
-			azp: 'nodebb',
-		},
-	});
-	try {
-		const claims = await oidc.verifyIdToken({
-			jwksUri: 'https://auth.example.com/jwks/',
-			clientId: 'nodebb',
-			issuer: 'https://auth.example.com/application/o/nodebb/',
-		}, 'token', 'nonce-1');
-		assert.equal(claims.sub, 'sub-1');
-	} finally {
-		restore();
-	}
-});
-
-test('ID token verification rejects invalid access token hash when present', async () => {
-	const { publicKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
-	const signingJwk = publicKey.export({ format: 'jwk' });
-	signingJwk.kid = 'signing-key';
-	signingJwk.use = 'sig';
-	signingJwk.alg = 'RS256';
-
-	const { oidc, restore } = loadOidcForIdToken({
-		header: { alg: 'RS256', kid: 'signing-key' },
-		keys: [signingJwk],
-		claims: {
-			sub: 'sub-1',
-			nonce: 'nonce-1',
-			at_hash: oidcHash('different-access-token'),
-		},
-	});
-	try {
-		await assert.rejects(
-			oidc.verifyIdToken({
-				jwksUri: 'https://auth.example.com/jwks/',
-				clientId: 'nodebb',
-				issuer: 'https://auth.example.com/application/o/nodebb/',
-			}, 'token', 'nonce-1', { accessToken: 'access-token' }),
-			/access token hash/
-		);
-	} finally {
-		restore();
-	}
-});
-
-test('ID token verification rejects invalid authorization code hash when present', async () => {
-	const { publicKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
-	const signingJwk = publicKey.export({ format: 'jwk' });
-	signingJwk.kid = 'signing-key';
-	signingJwk.use = 'sig';
-	signingJwk.alg = 'RS256';
-
-	const { oidc, restore } = loadOidcForIdToken({
-		header: { alg: 'RS256', kid: 'signing-key' },
-		keys: [signingJwk],
-		claims: {
-			sub: 'sub-1',
-			nonce: 'nonce-1',
-			c_hash: oidcHash('different-code'),
-		},
-	});
-	try {
-		await assert.rejects(
-			oidc.verifyIdToken({
-				jwksUri: 'https://auth.example.com/jwks/',
-				clientId: 'nodebb',
-				issuer: 'https://auth.example.com/application/o/nodebb/',
-			}, 'token', 'nonce-1', { code: 'authorization-code' }),
-			/authorization code hash/
-		);
-	} finally {
-		restore();
-	}
-});
-
-test('ID token verification accepts matching access token and authorization code hashes', async () => {
-	const { publicKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
-	const signingJwk = publicKey.export({ format: 'jwk' });
-	signingJwk.kid = 'signing-key';
-	signingJwk.use = 'sig';
-	signingJwk.alg = 'RS256';
-
-	const { oidc, restore } = loadOidcForIdToken({
-		header: { alg: 'RS256', kid: 'signing-key' },
-		keys: [signingJwk],
-		claims: {
-			sub: 'sub-1',
-			nonce: 'nonce-1',
-			at_hash: oidcHash('access-token'),
-			c_hash: oidcHash('authorization-code'),
-		},
-	});
-	try {
-		const claims = await oidc.verifyIdToken({
-			jwksUri: 'https://auth.example.com/jwks/',
-			clientId: 'nodebb',
-			issuer: 'https://auth.example.com/application/o/nodebb/',
-		}, 'token', 'nonce-1', {
-			accessToken: 'access-token',
-			code: 'authorization-code',
-		});
-		assert.equal(claims.sub, 'sub-1');
 	} finally {
 		restore();
 	}
@@ -569,34 +505,69 @@ test('claim merging rejects conflicting email values', () => {
 	}
 });
 
-test('logout token verification accepts signed back-channel logout event', async () => {
-	const { publicKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
-	const signingJwk = publicKey.export({ format: 'jwk' });
-	signingJwk.kid = 'signing-key';
-	signingJwk.use = 'sig';
-	signingJwk.alg = 'RS256';
-
-	const { oidc, restore } = loadOidcForLogoutToken({
-		header: { alg: 'RS256', kid: 'signing-key' },
-		keys: [signingJwk],
-		claims: {
-			iss: 'https://auth.example.com/application/o/nodebb/',
-			aud: 'nodebb',
-			sub: 'sub-1',
-			sid: 'sid-1',
-			iat: Math.floor(Date.now() / 1000),
-			jti: 'logout-1',
-			events: {
-				'http://schemas.openid.net/event/backchannel-logout': {},
+test('claim merging keeps signed ID token profile fields over UserInfo conflicts', () => {
+	const { oidc, restore } = loadOidc();
+	try {
+		const claims = oidc.mergeClaims(
+			{
+				sub: 'sub-1',
+				email: 'person@example.com',
+				email_verified: true,
+				preferred_username: 'signed-name',
+				name: 'Signed Name',
 			},
+			{
+				sub: 'sub-1',
+				email: 'person@example.com',
+				email_verified: true,
+				preferred_username: 'userinfo-name',
+				name: 'UserInfo Name',
+			}
+		);
+		assert.equal(claims.preferred_username, 'signed-name');
+		assert.equal(claims.name, 'Signed Name');
+	} finally {
+		restore();
+	}
+});
+
+test('normalized claims ignore groups and roles', () => {
+	const { oidc, restore } = loadOidc();
+	try {
+		const claims = oidc.normalizeClaims({
+			sub: 'sub-1',
+			email: 'person@example.com',
+			email_verified: true,
+			groups: ['admin'],
+			roles: ['moderator'],
+		});
+		assert.equal(Object.prototype.hasOwnProperty.call(claims, 'groups'), false);
+		assert.equal(Object.prototype.hasOwnProperty.call(claims, 'roles'), false);
+	} finally {
+		restore();
+	}
+});
+
+test('logout token verification accepts signed back-channel logout event', async () => {
+	const { privateKey, jwk, kid } = rsaKeyPair('signing-key');
+	const { oidc, restore } = loadOidcWithRealJwt({ jwksResponses: [{ keys: [jwk] }] });
+	const token = await signToken(privateKey, kid, {
+		iss: 'https://auth.example.com/application/o/nodebb/',
+		aud: 'nodebb',
+		sub: 'sub-1',
+		sid: 'sid-1',
+		iat: Math.floor(Date.now() / 1000),
+		jti: 'logout-1',
+		events: {
+			'http://schemas.openid.net/event/backchannel-logout': {},
 		},
 	});
 	try {
-		const claims = await oidc.verifyLogoutToken({
-			jwksUri: 'https://auth.example.com/jwks/',
+		const claims = await withJwksFetch({ keys: [jwk] }, () => oidc.verifyLogoutToken({
+			jwksUri: 'https://auth.example.com/jwks/accept/',
 			clientId: 'nodebb',
 			issuer: 'https://auth.example.com/application/o/nodebb/',
-		}, 'logout-token');
+		}, token));
 		assert.equal(claims.sub, 'sub-1');
 		assert.equal(claims.sid, 'sid-1');
 		assert.equal(claims.jti, 'logout-1');
@@ -606,31 +577,25 @@ test('logout token verification accepts signed back-channel logout event', async
 });
 
 test('logout token verification rejects stale issued-at values', async () => {
-	const { publicKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
-	const signingJwk = publicKey.export({ format: 'jwk' });
-	signingJwk.kid = 'signing-key';
-	signingJwk.use = 'sig';
-	signingJwk.alg = 'RS256';
-
-	const { oidc, restore } = loadOidcForLogoutToken({
-		header: { alg: 'RS256', kid: 'signing-key' },
-		keys: [signingJwk],
-		claims: {
-			sub: 'sub-1',
-			iat: Math.floor((Date.now() - (11 * 60 * 1000)) / 1000),
-			jti: 'logout-1',
-			events: {
-				'http://schemas.openid.net/event/backchannel-logout': {},
-			},
+	const { privateKey, jwk, kid } = rsaKeyPair('signing-key');
+	const { oidc, restore } = loadOidcWithRealJwt({ jwksResponses: [{ keys: [jwk] }] });
+	const token = await signToken(privateKey, kid, {
+		iss: 'https://auth.example.com/application/o/nodebb/',
+		aud: 'nodebb',
+		sub: 'sub-1',
+		iat: Math.floor((Date.now() - (11 * 60 * 1000)) / 1000),
+		jti: 'logout-1',
+		events: {
+			'http://schemas.openid.net/event/backchannel-logout': {},
 		},
 	});
 	try {
 		await assert.rejects(
-			oidc.verifyLogoutToken({
-				jwksUri: 'https://auth.example.com/jwks/',
+			withJwksFetch({ keys: [jwk] }, () => oidc.verifyLogoutToken({
+				jwksUri: 'https://auth.example.com/jwks/stale/',
 				clientId: 'nodebb',
 				issuer: 'https://auth.example.com/application/o/nodebb/',
-			}, 'logout-token'),
+			}, token)),
 			/issued-at is outside/
 		);
 	} finally {
@@ -639,31 +604,24 @@ test('logout token verification rejects stale issued-at values', async () => {
 });
 
 test('logout token verification rejects missing logout event', async () => {
-	const { publicKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
-	const signingJwk = publicKey.export({ format: 'jwk' });
-	signingJwk.kid = 'signing-key';
-	signingJwk.use = 'sig';
-	signingJwk.alg = 'RS256';
-
-	const { oidc, restore } = loadOidcForLogoutToken({
-		header: { alg: 'RS256', kid: 'signing-key' },
-		keys: [signingJwk],
-		claims: {
-			sub: 'sub-1',
-			sid: 'sid-1',
-			iat: Math.floor(Date.now() / 1000),
-			jti: 'logout-1',
-			nonce: 'not-allowed',
-			events: {},
-		},
+	const { privateKey, jwk, kid } = rsaKeyPair('signing-key');
+	const { oidc, restore } = loadOidcWithRealJwt({ jwksResponses: [{ keys: [jwk] }] });
+	const token = await signToken(privateKey, kid, {
+		iss: 'https://auth.example.com/application/o/nodebb/',
+		aud: 'nodebb',
+		sub: 'sub-1',
+		sid: 'sid-1',
+		iat: Math.floor(Date.now() / 1000),
+		jti: 'logout-1',
+		events: {},
 	});
 	try {
 		await assert.rejects(
-			oidc.verifyLogoutToken({
-				jwksUri: 'https://auth.example.com/jwks/',
+			withJwksFetch({ keys: [jwk] }, () => oidc.verifyLogoutToken({
+				jwksUri: 'https://auth.example.com/jwks/missing-event/',
 				clientId: 'nodebb',
 				issuer: 'https://auth.example.com/application/o/nodebb/',
-			}, 'logout-token'),
+			}, token)),
 			/missing the back-channel logout event/
 		);
 	} finally {
@@ -672,34 +630,77 @@ test('logout token verification rejects missing logout event', async () => {
 });
 
 test('logout token verification rejects nonce', async () => {
-	const { publicKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
-	const signingJwk = publicKey.export({ format: 'jwk' });
-	signingJwk.kid = 'signing-key';
-	signingJwk.use = 'sig';
-	signingJwk.alg = 'RS256';
-
-	const { oidc, restore } = loadOidcForLogoutToken({
-		header: { alg: 'RS256', kid: 'signing-key' },
-		keys: [signingJwk],
-		claims: {
-			sub: 'sub-1',
-			iat: Math.floor(Date.now() / 1000),
-			jti: 'logout-1',
-			nonce: 'not-allowed',
-			events: {
-				'http://schemas.openid.net/event/backchannel-logout': {},
-			},
+	const { privateKey, jwk, kid } = rsaKeyPair('signing-key');
+	const { oidc, restore } = loadOidcWithRealJwt({ jwksResponses: [{ keys: [jwk] }] });
+	const token = await signToken(privateKey, kid, {
+		iss: 'https://auth.example.com/application/o/nodebb/',
+		aud: 'nodebb',
+		sub: 'sub-1',
+		iat: Math.floor(Date.now() / 1000),
+		jti: 'logout-1',
+		nonce: 'not-allowed',
+		events: {
+			'http://schemas.openid.net/event/backchannel-logout': {},
 		},
 	});
 	try {
 		await assert.rejects(
-			oidc.verifyLogoutToken({
-				jwksUri: 'https://auth.example.com/jwks/',
+			withJwksFetch({ keys: [jwk] }, () => oidc.verifyLogoutToken({
+				jwksUri: 'https://auth.example.com/jwks/nonce/',
 				clientId: 'nodebb',
 				issuer: 'https://auth.example.com/application/o/nodebb/',
-			}, 'logout-token'),
+			}, token)),
 			/must not contain nonce/
 		);
+	} finally {
+		restore();
+	}
+});
+
+test('real logout token verification rejects unsigned, wrong issuer, wrong audience, and unknown kid tokens', async () => {
+	const now = Math.floor(Date.now() / 1000);
+	const { privateKey, jwk, kid } = rsaKeyPair('logout-rsa-1');
+	const { oidc, restore } = loadOidcWithRealJwt({
+		jwksResponses: [{ keys: [jwk] }, { keys: [jwk] }, { keys: [jwk] }, { keys: [jwk] }],
+	});
+	const baseSettings = {
+		jwksUri: 'https://auth.example.com/jwks/logout/',
+		clientId: 'nodebb',
+		issuer: 'https://auth.example.com/application/o/nodebb/',
+		idTokenSigningAlg: 'RS256',
+	};
+	const baseClaims = {
+		iss: baseSettings.issuer,
+		aud: 'nodebb',
+		sub: 'sub-1',
+		iat: now,
+		jti: 'logout-1',
+		events: {
+			'http://schemas.openid.net/event/backchannel-logout': {},
+		},
+	};
+	try {
+		const unsigned = [
+			Buffer.from(JSON.stringify({ alg: 'none' })).toString('base64url'),
+			Buffer.from(JSON.stringify(baseClaims)).toString('base64url'),
+			'',
+		].join('.');
+			await assert.rejects(
+				oidc.verifyLogoutToken(baseSettings, unsigned),
+				/Algorithm.*not allowed/
+			);
+			await assert.rejects(
+				withJwksFetch({ keys: [jwk] }, async () => oidc.verifyLogoutToken(baseSettings, await signToken(privateKey, kid, { ...baseClaims, iss: 'https://evil.example.com/' }))),
+				/iss|issuer/
+			);
+			await assert.rejects(
+				withJwksFetch({ keys: [jwk] }, async () => oidc.verifyLogoutToken(baseSettings, await signToken(privateKey, kid, { ...baseClaims, aud: 'other-client' }))),
+				/aud|audience/
+			);
+			await assert.rejects(
+				withJwksFetch({ keys: [jwk] }, async () => oidc.verifyLogoutToken(baseSettings, await signToken(privateKey, 'unknown-kid', baseClaims))),
+				/applicable key|signing key/
+			);
 	} finally {
 		restore();
 	}

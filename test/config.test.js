@@ -236,3 +236,101 @@ test('development HTTP override still rejects private HTTPS provider targets', (
 		restore();
 	}
 });
+
+test('PKCE cannot be disabled and confidential clients default to basic auth', async () => {
+	const mocks = createMocks();
+	const { config, restore } = loadConfig(mocks);
+	try {
+		const saved = await config.saveSettings(enabledSettings({
+			usePkce: false,
+		}));
+		assert.equal(saved.usePkce, undefined);
+		assert.equal(saved.tokenEndpointAuthMethod, 'client_secret_basic');
+		assert.equal((await config.getSettings()).tokenEndpointAuthMethod, 'client_secret_basic');
+	} finally {
+		restore();
+	}
+});
+
+test('offline_access scopes are rejected because refresh tokens are unsupported', async () => {
+	const mocks = createMocks();
+	const { config, restore } = loadConfig(mocks);
+	try {
+		await assert.rejects(
+			config.saveSettings(enabledSettings({
+				scopes: 'openid email profile offline_access',
+			})),
+			(err) => {
+				assert.equal(err.errors.scopes, 'Must not request offline_access');
+				return true;
+			}
+		);
+	} finally {
+		restore();
+	}
+});
+
+test('unsupported ID token signing algorithms are rejected by settings validation', async () => {
+	const mocks = createMocks();
+	const { config, restore } = loadConfig(mocks);
+	try {
+		await assert.rejects(
+			config.saveSettings(enabledSettings({
+				idTokenSigningAlg: 'HS256',
+			})),
+			(err) => {
+				assert.equal(err.errors.idTokenSigningAlg, 'Must be a supported asymmetric signing algorithm');
+				return true;
+			}
+		);
+	} finally {
+		restore();
+	}
+});
+
+test('callback HTTP development flag does not allow loopback provider endpoints', async () => {
+	const mocks = createMocks();
+	const { config, restore } = loadConfig(mocks);
+	try {
+		await assert.rejects(
+			config.saveSettings(enabledSettings({
+				allowInsecureCallbackUrlForDevelopment: true,
+				tokenEndpoint: 'http://localhost:9000/application/o/nodebb/token/',
+			})),
+			(err) => {
+				assert.equal(err.errors.tokenEndpoint, 'Must be an HTTPS URL');
+				return true;
+			}
+		);
+		const saved = await config.saveSettings(enabledSettings({
+			allowInsecureCallbackUrlForDevelopment: true,
+			allowLoopbackProviderEndpointsForDevelopment: true,
+			issuer: 'http://localhost:9000/application/o/nodebb/',
+			authorizationEndpoint: 'http://localhost:9000/application/o/nodebb/authorize/',
+			tokenEndpoint: 'http://localhost:9000/application/o/nodebb/token/',
+			userinfoEndpoint: 'http://localhost:9000/application/o/nodebb/userinfo/',
+			jwksUri: 'http://localhost:9000/application/o/nodebb/jwks/',
+		}));
+		assert.equal(saved.allowLoopbackProviderEndpointsForDevelopment, true);
+	} finally {
+		restore();
+	}
+});
+
+test('provider loopback development flag permits IPv6 loopback HTTP endpoints', async () => {
+	const mocks = createMocks();
+	const { config, restore } = loadConfig(mocks);
+	try {
+		const saved = await config.saveSettings(enabledSettings({
+			allowLoopbackProviderEndpointsForDevelopment: true,
+			issuer: 'http://[::1]:9000/application/o/nodebb/',
+			authorizationEndpoint: 'http://[::1]:9000/application/o/nodebb/authorize/',
+			tokenEndpoint: 'http://[::1]:9000/application/o/nodebb/token/',
+			userinfoEndpoint: 'http://[::1]:9000/application/o/nodebb/userinfo/',
+			jwksUri: 'http://[::1]:9000/application/o/nodebb/jwks/',
+		}));
+		assert.equal(saved.issuer, 'http://[::1]:9000/application/o/nodebb/');
+	} finally {
+		restore();
+	}
+});

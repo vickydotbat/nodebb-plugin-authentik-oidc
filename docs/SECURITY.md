@@ -1,6 +1,6 @@
 # Security Notes
 
-`nodebb-plugin-authentik-oidc` treats the OIDC `sub` claim as the permanent external identity. Email is only a secondary linking mechanism and only when `email_verified` is the boolean `true`.
+`nodebb-plugin-authentik-oidc` treats exact OIDC `issuer + sub` as the permanent external identity. Email is not a normal-login account-binding factor unless an administrator explicitly enables the trusted verified-email migration policy.
 
 The plugin deliberately rejects logins when:
 
@@ -10,10 +10,18 @@ The plugin deliberately rejects logins when:
 - An existing `sub` mapping and verified email point to different NodeBB users.
 - A verified email belongs to a NodeBB account already linked to another `sub`.
 - ID token and userinfo `sub` values differ.
+- A legacy `sub`-only mapping exists but the linked user's stored issuer does not exactly match the configured issuer.
+- A subject mapping points to a missing/deleted NodeBB user.
+- The resolved NodeBB user is currently restricted from login by NodeBB ban policy.
+- The resolved NodeBB user has common disabled/suspended/deactivated account flags set.
+- Trusted verified-email auto-linking targets a local account whose email is not already confirmed.
+- Trusted verified-email auto-linking targets a local admin/moderator/privileged account.
 
 The plugin never links or finds accounts by username. `preferred_username` and `name` are only used to seed the initial display username for newly created NodeBB users.
 
-Admins can disable new SSO account creation. In that mode, an existing `sub` mapping still logs in and a verified email can still link to an existing NodeBB user, but an otherwise new verified OIDC identity is rejected without creating a user or mapping.
+Admins can disable new SSO account creation. In that mode, an existing issuer-qualified subject mapping still logs in, but a verified email match alone does not link to an existing NodeBB user under the default policy.
+
+The optional trusted verified-email auto-linking policy is only for deliberate migration windows. Even then, the target local account must already have a confirmed local email and must not be an admin/moderator/privileged account. Privileged accounts require explicit logged-in linking or administrator repair, not silent email-based migration.
 
 Already-linked accounts continue to resolve by stored `sub` when the provider later emits an unverified email claim, as long as the email is present and does not collide with another NodeBB uid. The unverified email is not used to create or link an account.
 
@@ -25,9 +33,13 @@ The ACP Last authorization diagnostic stores sanitized authorization and clear-s
 
 The user-facing linked-account page deliberately does not expose the OIDC `sub`, reverse mapping keys, raw claims, tokens, or authorization artifacts. It shows only linked status, provider display name, issuer, timestamps, the last provider email seen by the plugin, and configured external self-service links.
 
-Display name synchronization, when enabled, runs only after identity resolution has succeeded by `sub` or verified email. The provider `name` claim is not used for identity and missing names do not erase the local `fullname`.
+Display name synchronization, when enabled, runs only after identity resolution has succeeded by issuer-qualified `sub`. The provider `name` claim is not used for identity, missing names do not erase the local `fullname`, and obvious staff/system names such as `Admin`, `Moderator`, `System`, and `Root` are skipped for non-privileged users.
 
-Admin-triggered provider discovery, JWKS diagnostics, provider endpoints, and self-service links are restricted to HTTPS URLs by default and reject localhost or private network targets. Loopback HTTP is allowed only when the explicit development override is enabled. This reduces SSRF risk from ACP diagnostics and prevents unsafe links from being rendered to users.
+Admin-triggered provider discovery, JWKS diagnostics, provider endpoints, and self-service links are restricted to HTTPS URLs by default and reject localhost or private network targets. Callback HTTP and loopback provider HTTP have separate explicit development overrides. This reduces SSRF risk from ACP diagnostics and prevents unsafe links from being rendered to users.
+
+PKCE is always enabled and generated with `openid-client` primitives. The plugin rejects `offline_access` scopes because refresh tokens are intentionally unsupported, confidential token exchange defaults to `client_secret_basic`, normal login ID-token validation is handled by `openid-client`, and back-channel logout token verification is handled by `jose`. Signing algorithms default to the Authentik-typical `RS256` unless an administrator explicitly pins another supported asymmetric algorithm.
+
+Provider requests made through `openid-client` and `jose` use a custom fetch wrapper that validates the original provider URL, disables automatic redirects, validates redirect targets when present, and rejects provider redirects rather than following them. This keeps discovery, token, UserInfo, and JWKS requests inside the same SSRF safety model as the plugin's direct HTTP helper.
 
 ## Provider Boundary
 
@@ -42,7 +54,6 @@ For live testing, do not assume Authentik custom attributes change OIDC claims. 
 - Evaluate whether the strict username-collision policy should become the recommended release default for this installation. This is a product/admin policy, not an identity-safety requirement.
 - Add cleanup tooling for stale `authentik:sub:uid` mappings and duplicate test accounts created during early live testing.
 - Keep Authentik-side flow/policy guidance current as Authentik changes its email-verification and logout behavior.
-- Consider DNS resolution checks for discovery/JWKS requests if the deployment allows arbitrary hostnames that can resolve to private addresses.
 
 ## Profile Synchronization Security
 
@@ -97,9 +108,19 @@ The back-channel logout handler:
 - Accepts only signed OIDC logout tokens from the configured issuer/audience and JWKS.
 - Requires the standard back-channel logout event, `iat`, `jti`, and either `sub` or `sid`.
 - Rejects logout tokens with `nonce`.
-- Maps `sub` to the permanent Authentik subject mapping, or `sid` to the OIDC session id captured during login.
-- Calls NodeBB's session revocation API for the mapped uid.
+- Maps issuer-qualified `sub` to the permanent Authentik subject mapping, or `sid` to the OIDC session id captured during login.
+- Calls NodeBB's session-specific revocation API for a mapped `sid` when a NodeBB session id is available; subject-only logout falls back to revoking sessions for the mapped uid.
 - Does not store access tokens, refresh tokens, raw ID tokens, or logout tokens.
 - Records only sanitized ACP diagnostics for the last back-channel logout attempt: whether a request was seen, whether a logout token was present and validated, whether `sub`/`sid` were present, the matched uid, and the outcome.
 
-This intentionally revokes all NodeBB sessions for the mapped uid rather than trying to keep a local browser-session-to-OIDC-session graph. That is conservative for the current plugin goal: an upstream Authentik session closure should not leave an active NodeBB session behind.
+Subject-only logout intentionally revokes sessions for the mapped uid because the provider did not identify a specific RP session. When `sid` and the NodeBB session id are available, logout is limited to that mapped session.
+
+OIDC back-channel logout is intentionally not protected by a browser CSRF token because Authentik calls it server-to-server. It must remain POST-only and token-authenticated: no cookie-session mutation should be added to this route unless it is still gated by signed logout-token validation.
+
+## NodeBB Deployment Requirements
+
+Clustered NodeBB deployments must use a shared NodeBB session store so the login-start request and callback request can access the same session-backed OIDC state, nonce, and PKCE verifier. The plugin deliberately has no process-memory fallback for auth state.
+
+Production NodeBB session cookies must be configured with HttpOnly, Secure behind HTTPS, and SameSite=Lax or another explicitly reviewed value. Cookie attributes and session regeneration are owned by NodeBB/Passport, so they must be verified in a running NodeBB 4.x deployment before release.
+
+The plugin adds explicit CSRF middleware to admin mutation routes when the target NodeBB middleware exposes one, and the ACP client sends `x-csrf-token`. Route-level CSRF behavior should still be verified against the target NodeBB version.

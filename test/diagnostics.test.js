@@ -59,7 +59,7 @@ test('last authorization diagnostics sanitize outbound redirect URLs', async () 
 			hasEndSessionEndpoint: true,
 			authorizationParameters: 'prompt=login',
 			redirectTarget: 'https://auth.example.com/application/o/authorize/?response_type=code&client_id=nodebb&redirect_uri=https%3A%2F%2Fforum.example.com%2Fauth%2Fauthentik%2Fcallback&scope=openid+email+profile&state=secret-state&nonce=secret-nonce&code_challenge=secret-challenge&code_challenge_method=S256&prompt=login&max_age=0',
-			returnTo: 'https://forum.example.com/auth/authentik?authentikFreshLogin=1',
+			returnTo: 'https://forum.example.com/auth/authentik',
 		});
 		const authorization = await diagnostics.getLastAuthorizationStart();
 		assert.equal(authorization.stage, 'authorization');
@@ -102,6 +102,76 @@ test('last authorization diagnostics preserve sanitized provider-relative clear-
 		assert.equal(authorization.returnTo.includes('max_age=0'), true);
 		assert.equal(authorization.returnTo.includes('secret-state'), false);
 		assert.equal(authorization.returnTo.includes('secret-nonce'), false);
+	} finally {
+		restore();
+	}
+});
+
+test('failure diagnostics sanitize secret-bearing lower-level error messages', async () => {
+	const mocks = createMocks();
+	const { diagnostics, restore } = loadDiagnostics(mocks);
+	try {
+		await diagnostics.recordFailure({
+			err: new Error('HTTP 400 from https://auth.example.com/token?code=secret-code&client_secret=secret-client-secret access_token=secret-access id_token=secret-id'),
+			stage: 'callback',
+			settings: { issuer: 'https://auth.example.com/application/o/nodebb/' },
+			idClaims: null,
+			userinfoClaims: null,
+			mergedClaims: null,
+		});
+		const failure = await diagnostics.getLastFailure();
+		const output = JSON.stringify(failure);
+		[
+			'secret-code',
+			'secret-client-secret',
+			'secret-access',
+			'secret-id',
+		].forEach((secret) => {
+			assert.equal(output.includes(secret), false, `${secret} leaked in ${output}`);
+		});
+		assert.equal(output.includes('[redacted]'), true);
+	} finally {
+		restore();
+	}
+});
+
+test('failure diagnostics never store raw token response material', async () => {
+	const mocks = createMocks();
+	const { diagnostics, restore } = loadDiagnostics(mocks);
+	try {
+		await diagnostics.recordFailure({
+			err: new Error('token response contained access_token=secret-access refresh_token=secret-refresh id_token=secret-id'),
+			stage: 'callback',
+			settings: { issuer: 'https://auth.example.com/application/o/nodebb/' },
+			idClaims: {
+				sub: 'sub-1',
+				email: 'person@example.com',
+				email_verified: true,
+				access_token: 'secret-access',
+				refresh_token: 'secret-refresh',
+				id_token: 'secret-id',
+			},
+			userinfoClaims: {
+				sub: 'sub-1',
+				email: 'person@example.com',
+				email_verified: true,
+			},
+			mergedClaims: {
+				sub: 'sub-1',
+				email: 'person@example.com',
+				email_verified: true,
+				id_token: 'secret-id',
+			},
+		});
+		const output = JSON.stringify(await diagnostics.getLastFailure());
+		[
+			'secret-access',
+			'secret-refresh',
+			'secret-id',
+			'person@example.com',
+		].forEach((secret) => {
+			assert.equal(output.includes(secret), false, `${secret} leaked in ${output}`);
+		});
 	} finally {
 		restore();
 	}

@@ -73,7 +73,7 @@
   - `reject`: fail new SSO account creation when NodeBB reports the username/userslug is unavailable.
 - Extend the new ACP mapping audit/repair tooling with CLI access if live operations need non-browser repair.
 - Add tests around NodeBB's userslug collision behavior, not only exact username matching.
-- Consider DNS resolution checks before outbound discovery/JWKS fetches to catch hostnames that resolve to private IP addresses.
+- Discovery and JWKS fetches now use the shared SSRF-safe fetch path; keep that behavior covered when changing provider request code.
 
 ## Avatar Investigation
 
@@ -135,14 +135,14 @@
 
 - Rework the ACP page into clear sections:
   - Provider connection: enabled, display name, issuer, discovery, endpoints, JWKS URI, client id, client secret, scopes, callback URL.
-  - Login behavior: authorization parameters, PKCE toggle, HTTPS development override, local login policy, and the existing account creation policy.
+  - Login behavior: authorization parameters, always-on PKCE status, split callback/provider development overrides, local login policy, and the existing account creation policy.
   - Identity rules: verified-email requirement, username collision policy, email collision behavior, stale mapping cleanup behavior.
   - Synchronization: per-field sync toggles for email, username, fullname, avatar, custom claim mappings, and role/group attachment mappings.
   - Diagnostics and repair: test discovery, test provider connection, inspect sanitized last failure, audit mappings, repair stale mappings.
 - Add switches and levers:
   - Enable/disable plugin.
-  - Use PKCE.
   - Allow insecure callback URL for local development only.
+  - Allow loopback provider endpoints for local development only.
   - Force account selection/fresh Authentik login via preset authorization parameters.
   - Account creation policy is implemented; improve its confirmation/field grouping in the ACP.
   - Username collision policy: generate unique, keep existing/local, or reject.

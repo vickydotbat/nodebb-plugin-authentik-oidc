@@ -172,7 +172,16 @@
 				<div class="form-check form-switch mb-3">
 					<input class="form-check-input" type="checkbox" id="allowAccountCreation" data-authentik-field="allowAccountCreation">
 					<label class="form-check-label" for="allowAccountCreation">Allow new SSO account creation</label>
-					<div class="form-text">When disabled, only an existing linked subject or a verified email match can log in.</div>
+					<div class="form-text">When disabled, only an existing issuer-qualified linked subject can log in.</div>
+				</div>
+
+				<div class="mb-3">
+					<label class="form-label" for="accountLinkingPolicy">Existing account linking policy</label>
+					<select class="form-select" id="accountLinkingPolicy" data-authentik-field="accountLinkingPolicy">
+						<option value="no_auto_link">Do not auto-link by email</option>
+						<option value="trusted_email_auto_link">Trusted verified-email auto-linking</option>
+					</select>
+					<div class="form-text">The default avoids silent takeover of existing local accounts. Trusted auto-linking is for reviewed migrations only; the local email must already be confirmed and privileged accounts are blocked.</div>
 				</div>
 
 				<div class="form-check form-switch mb-3">
@@ -184,7 +193,7 @@
 				<div class="form-check form-switch mb-3">
 					<input class="form-check-input" type="checkbox" id="syncFullnameOnLogin" data-authentik-field="syncFullnameOnLogin">
 					<label class="form-check-label" for="syncFullnameOnLogin">Sync display name from OIDC name claim</label>
-					<div class="form-text">When enabled, successful SSO logins update NodeBB fullname from the provider after identity resolution succeeds.</div>
+					<div class="form-text">When enabled, successful SSO logins update NodeBB fullname from the provider after identity resolution succeeds. Reserved staff/system names are skipped for non-privileged users.</div>
 				</div>
 
 				<div class="mb-3">
@@ -198,14 +207,30 @@
 					<div class="form-text text-danger" data-authentik-error="backchannelLogoutUrl"></div>
 				</div>
 
-				<div class="form-check form-switch mb-3">
-					<input class="form-check-input" type="checkbox" id="usePkce" data-authentik-field="usePkce">
-					<label class="form-check-label" for="usePkce">Use PKCE</label>
+				<div class="mb-3">
+					<label class="form-label" for="tokenEndpointAuthMethod">Token endpoint client authentication</label>
+					<select class="form-select" id="tokenEndpointAuthMethod" data-authentik-field="tokenEndpointAuthMethod">
+						<option value="client_secret_basic">client_secret_basic</option>
+						<option value="client_secret_post">client_secret_post</option>
+					</select>
+					<div class="form-text">Use Basic authentication unless the provider explicitly requires posting the client secret in the token request body.</div>
+				</div>
+
+				<div class="mb-3">
+					<label class="form-label" for="idTokenSigningAlg">Expected ID token signing algorithm</label>
+					<input class="form-control" type="text" id="idTokenSigningAlg" data-authentik-field="idTokenSigningAlg" placeholder="RS256">
+					<div class="form-text">Algorithm pin used for ID and logout tokens. Default is RS256 for Authentik.</div>
 				</div>
 
 				<div class="form-check form-switch mb-3">
 					<input class="form-check-input" type="checkbox" id="allowInsecureCallbackUrlForDevelopment" data-authentik-field="allowInsecureCallbackUrlForDevelopment">
 					<label class="form-check-label" for="allowInsecureCallbackUrlForDevelopment">Allow HTTP callback URL for localhost development</label>
+				</div>
+
+				<div class="form-check form-switch mb-3">
+					<input class="form-check-input" type="checkbox" id="allowLoopbackProviderEndpointsForDevelopment" data-authentik-field="allowLoopbackProviderEndpointsForDevelopment">
+					<label class="form-check-label" for="allowLoopbackProviderEndpointsForDevelopment">Allow HTTP loopback provider endpoints for local development</label>
+					<div class="form-text text-danger">Development only. This permits token, UserInfo, JWKS, and discovery endpoints on loopback HTTP.</div>
 				</div>
 			</form>
 

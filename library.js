@@ -28,6 +28,7 @@ plugin.init = async function ({ router, middleware }) {
 
 plugin.registerApiRoutes = async function ({ router, middleware }) {
 	const adminMiddlewares = [middleware.ensureLoggedIn, ensureSettingsAdmin];
+	const adminMutationMiddlewares = csrfMiddlewares(middleware).concat(adminMiddlewares);
 
 	routeHelpers.setupApiRoute(
 		router,
@@ -40,21 +41,21 @@ plugin.registerApiRoutes = async function ({ router, middleware }) {
 		router,
 		'post',
 		'/authentik-oidc/settings',
-		adminMiddlewares,
+		adminMutationMiddlewares,
 		admin.saveSettings
 	);
 	routeHelpers.setupApiRoute(
 		router,
 		'post',
 		'/authentik-oidc/discover',
-		adminMiddlewares,
+		adminMutationMiddlewares,
 		admin.discover
 	);
 	routeHelpers.setupApiRoute(
 		router,
 		'post',
 		'/authentik-oidc/jwks/test',
-		adminMiddlewares,
+		adminMutationMiddlewares,
 		admin.testJwks
 	);
 	routeHelpers.setupApiRoute(
@@ -89,10 +90,19 @@ plugin.registerApiRoutes = async function ({ router, middleware }) {
 		router,
 		'post',
 		'/authentik-oidc/mappings/repair-stale',
-		adminMiddlewares,
+		adminMutationMiddlewares,
 		admin.repairStaleMappings
 	);
 };
+
+function csrfMiddlewares(middleware) {
+	const candidates = [
+		middleware && middleware.applyCSRF,
+		middleware && middleware.csrf,
+		middleware && middleware.checkCSRF,
+	].filter(fn => typeof fn === 'function');
+	return candidates.length ? [candidates[0]] : [];
+}
 
 async function ensureSettingsAdmin(req, res, next) {
 	if (!await privileges.admin.can('admin:settings', req.uid)) {
@@ -142,3 +152,5 @@ plugin.initAuth = async function (strategies) {
 plugin.whitelistUserFields = async function (payload) {
 	return payload;
 };
+
+plugin.csrfMiddlewares = csrfMiddlewares;

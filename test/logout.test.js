@@ -137,6 +137,43 @@ test('back-channel logout can map sid to uid and removes used sid mapping', asyn
 	}
 });
 
+test('back-channel logout with sid revokes only mapped NodeBB session when available', async () => {
+	const mocks = createMocks();
+	mocks.state.sidToUid.set('sid-1', {
+		uid: 42,
+		issuer: 'https://auth.example.com/application/o/nodebb/',
+		sub: 'sub-1',
+		sessionId: 'nodebb-session-1',
+	});
+	mocks.state.users.set(42, { uid: 42, username: 'linked' });
+	mocks.state.settings.set('authentik-oidc', {
+		backchannelLogoutEnabled: true,
+		clientId: 'nodebb',
+		issuer: 'https://auth.example.com/application/o/nodebb/',
+		jwksUri: 'https://auth.example.com/jwks/',
+	});
+	const revoked = [];
+	mocks.user.auth.revokeSession = async (sessionId, uid) => {
+		revoked.push({ sessionId, uid });
+	};
+	const { logout, restore } = loadLogout(mocks, {
+		issuer: 'https://auth.example.com/application/o/nodebb/',
+		sid: 'sid-1',
+	});
+	try {
+		const res = response();
+		await logout.handleBackchannelLogout({
+			body: { logout_token: 'signed-token' },
+			query: {},
+		}, res);
+		assert.equal(res.statusCode, 204);
+		assert.deepEqual(revoked, [{ sessionId: 'nodebb-session-1', uid: 42 }]);
+		assert.deepEqual(mocks.state.revokedSessionsForUids, []);
+	} finally {
+		restore();
+	}
+});
+
 test('back-channel logout does not revoke sessions while disabled', async () => {
 	const mocks = createMocks();
 	mocks.state.subToUid.set('sub-1', 42);

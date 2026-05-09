@@ -145,7 +145,7 @@ test('new verified OIDC user does not inherit avatar fields from current NodeBB 
 	}
 });
 
-test('verified-email link to existing NodeBB account preserves existing avatar fields', async () => {
+test('trusted verified-email link to existing NodeBB account preserves existing avatar fields', async () => {
 	const mocks = createMocks();
 	const existingUid = await mocks.user.create({
 		username: 'archvillainette',
@@ -158,7 +158,10 @@ test('verified-email link to existing NodeBB account preserves existing avatar f
 	});
 	const { identity, restore } = loadIdentity(mocks);
 	try {
-		const result = await identity.resolve(verified(), { issuer: 'https://id.example.com' });
+		const result = await identity.resolve(verified(), {
+			issuer: 'https://id.example.com',
+			accountLinkingPolicy: 'trusted_email_auto_link',
+		});
 		assert.equal(result.uid, existingUid);
 		const linked = mocks.state.users.get(existingUid);
 		assert.equal(linked.picture, 'https://forum.example.com/assets/uploads/profile/avatar.png');
@@ -179,6 +182,7 @@ test('direct subject key resolves existing linked user for spec-compatible stora
 		username: 'linked',
 		email: 'person@example.com',
 		authentikSub: 'sub-1',
+		authentikIssuer: 'https://id.example.com',
 	});
 	mocks.state.emailToUid.set('person@example.com', 42);
 	mocks.state.directSubToUid.set('sub-1', 42);
@@ -213,8 +217,18 @@ test('login stores OIDC sid for back-channel logout mapping', async () => {
 	try {
 		const result = await identity.resolve(verified({ sid: 'session-1' }), { issuer: 'https://id.example.com' });
 		assert.equal(result.uid, 1);
-		assert.equal(mocks.state.sidToUid.get('session-1'), 1);
-		assert.equal(await identity.getUidBySid('session-1'), 1);
+		assert.deepEqual(mocks.state.sidToUid.get('session-1'), {
+			uid: 1,
+			issuer: 'https://id.example.com',
+			sub: 'sub-1',
+			sessionId: '',
+		});
+		assert.deepEqual(await identity.getUidBySid('session-1'), {
+			uid: 1,
+			issuer: 'https://id.example.com',
+			sub: 'sub-1',
+			sessionId: '',
+		});
 		assert.equal(mocks.state.users.get(1).authentikLastSid, 'session-1');
 	} finally {
 		restore();
@@ -234,13 +248,16 @@ test('same sub repeatedly resolves to same uid', async () => {
 	}
 });
 
-test('existing user with same verified email links without duplicate', async () => {
+test('trusted existing user with same confirmed verified email links without duplicate', async () => {
 	const mocks = createMocks();
-	mocks.state.users.set(42, { uid: 42, username: 'local', email: 'person@example.com' });
+	mocks.state.users.set(42, { uid: 42, username: 'local', email: 'person@example.com', 'email:confirmed': 1 });
 	mocks.state.emailToUid.set('person@example.com', 42);
 	const { identity, restore } = loadIdentity(mocks);
 	try {
-		const result = await identity.resolve(verified(), { issuer: 'https://id.example.com' });
+		const result = await identity.resolve(verified(), {
+			issuer: 'https://id.example.com',
+			accountLinkingPolicy: 'trusted_email_auto_link',
+		});
 		assert.equal(result.uid, 42);
 		assert.equal(mocks.state.users.size, 1);
 		assert.equal(mocks.state.subToUid.get('sub-1'), 42);
@@ -249,15 +266,15 @@ test('existing user with same verified email links without duplicate', async () 
 	}
 });
 
-test('concurrent verified-email links with different subjects fail closed', async () => {
+test('trusted concurrent verified-email links with different subjects fail closed', async () => {
 	const mocks = createMocks();
-	mocks.state.users.set(42, { uid: 42, username: 'local', email: 'person@example.com' });
+	mocks.state.users.set(42, { uid: 42, username: 'local', email: 'person@example.com', 'email:confirmed': 1 });
 	mocks.state.emailToUid.set('person@example.com', 42);
 	const { identity, restore } = loadIdentity(mocks);
 	try {
 		const results = await Promise.allSettled([
-			identity.resolve(verified({ sub: 'sub-1' }), { issuer: 'https://id.example.com' }),
-			identity.resolve(verified({ sub: 'sub-2' }), { issuer: 'https://id.example.com' }),
+			identity.resolve(verified({ sub: 'sub-1' }), { issuer: 'https://id.example.com', accountLinkingPolicy: 'trusted_email_auto_link' }),
+			identity.resolve(verified({ sub: 'sub-2' }), { issuer: 'https://id.example.com', accountLinkingPolicy: 'trusted_email_auto_link' }),
 		]);
 		assert.equal(results.filter(result => result.status === 'fulfilled').length, 1);
 		assert.equal(results.filter(result => result.status === 'rejected').length, 1);
@@ -272,15 +289,15 @@ test('concurrent verified-email links with different subjects fail closed', asyn
 	}
 });
 
-test('concurrent verified-email links from separate module instances fail closed', async () => {
+test('trusted concurrent verified-email links from separate module instances fail closed', async () => {
 	const mocks = createMocks();
-	mocks.state.users.set(42, { uid: 42, username: 'local', email: 'person@example.com' });
+	mocks.state.users.set(42, { uid: 42, username: 'local', email: 'person@example.com', 'email:confirmed': 1 });
 	mocks.state.emailToUid.set('person@example.com', 42);
 	const { identities, restore } = loadIdentityInstances(mocks, 2);
 	try {
 		const results = await Promise.allSettled([
-			identities[0].resolve(verified({ sub: 'sub-1' }), { issuer: 'https://id.example.com' }),
-			identities[1].resolve(verified({ sub: 'sub-2' }), { issuer: 'https://id.example.com' }),
+			identities[0].resolve(verified({ sub: 'sub-1' }), { issuer: 'https://id.example.com', accountLinkingPolicy: 'trusted_email_auto_link' }),
+			identities[1].resolve(verified({ sub: 'sub-2' }), { issuer: 'https://id.example.com', accountLinkingPolicy: 'trusted_email_auto_link' }),
 		]);
 		assert.equal(results.filter(result => result.status === 'fulfilled').length, 1);
 		assert.equal(results.filter(result => result.status === 'rejected').length, 1);
@@ -296,7 +313,47 @@ test('concurrent verified-email links from separate module instances fail closed
 	}
 });
 
-test('existing user with same unindexed email links without duplicate', async () => {
+test('stale database link lock is reclaimed during trusted email linking', async () => {
+	const mocks = createMocks();
+	mocks.state.users.set(42, { uid: 42, username: 'local', email: 'person@example.com', 'email:confirmed': 1 });
+	mocks.state.emailToUid.set('person@example.com', 42);
+	mocks.state.objects.set('authentik:link-lock:uid', { 42: 1 });
+	mocks.state.objects.set('authentik:link-lock-at:uid', { 42: Date.now() - (5 * 60 * 1000) });
+	const { identity, restore } = loadIdentity(mocks);
+	try {
+		const result = await identity.resolve(verified(), {
+			issuer: 'https://id.example.com',
+			accountLinkingPolicy: 'trusted_email_auto_link',
+		});
+		assert.equal(result.uid, 42);
+		assert.equal(mocks.state.users.get(42).authentikSub, 'sub-1');
+	} finally {
+		restore();
+	}
+});
+
+test('fresh database link lock still fails closed during trusted email linking', async () => {
+	const mocks = createMocks();
+	mocks.state.users.set(42, { uid: 42, username: 'local', email: 'person@example.com', 'email:confirmed': 1 });
+	mocks.state.emailToUid.set('person@example.com', 42);
+	mocks.state.objects.set('authentik:link-lock:uid', { 42: 1 });
+	mocks.state.objects.set('authentik:link-lock-at:uid', { 42: Date.now() });
+	const { identity, restore } = loadIdentity(mocks);
+	try {
+		await assert.rejects(
+			identity.resolve(verified(), {
+				issuer: 'https://id.example.com',
+				accountLinkingPolicy: 'trusted_email_auto_link',
+			}),
+			/Concurrent OIDC subject linking/
+		);
+		assert.equal(mocks.state.users.get(42).authentikSub, undefined);
+	} finally {
+		restore();
+	}
+});
+
+test('trusted existing user with unconfirmed same email is rejected', async () => {
 	const mocks = createMocks();
 	mocks.state.users.set(42, {
 		uid: 42,
@@ -306,12 +363,17 @@ test('existing user with same unindexed email links without duplicate', async ()
 	});
 	const { identity, restore } = loadIdentity(mocks);
 	try {
-		const result = await identity.resolve(verified(), { issuer: 'https://id.example.com' });
-		assert.equal(result.uid, 42);
+		await assert.rejects(
+			identity.resolve(verified(), {
+				issuer: 'https://id.example.com',
+				accountLinkingPolicy: 'trusted_email_auto_link',
+			}),
+			/Local email must already be confirmed/
+		);
 		assert.equal(mocks.state.users.size, 1);
-		assert.equal(mocks.state.subToUid.get('sub-1'), 42);
-		assert.equal(mocks.state.emailToUid.get('person@example.com'), 42);
-		assert.equal(mocks.state.users.get(42)['email:confirmed'], 1);
+		assert.equal(mocks.state.subToUid.get('sub-1'), undefined);
+		assert.equal(mocks.state.emailToUid.get('person@example.com'), undefined);
+		assert.equal(mocks.state.users.get(42)['email:confirmed'], 0);
 	} finally {
 		restore();
 	}
@@ -355,6 +417,7 @@ test('existing sub with unverified changed email still resolves by sub without l
 		username: 'linked',
 		email: 'person@example.com',
 		authentikSub: 'sub-1',
+		authentikIssuer: 'https://id.example.com',
 	});
 	mocks.state.emailToUid.set('person@example.com', 1);
 	mocks.state.subToUid.set('sub-1', 1);
@@ -379,6 +442,7 @@ test('existing sub with unverified email belonging to another uid fails safely',
 		username: 'linked',
 		email: 'person@example.com',
 		authentikSub: 'sub-1',
+		authentikIssuer: 'https://id.example.com',
 	});
 	mocks.state.users.set(2, {
 		uid: 2,
@@ -464,15 +528,15 @@ test('account creation disabled rejects new verified SSO user without mapping', 
 	}
 });
 
-test('account creation disabled still links existing verified email', async () => {
+test('trusted account creation disabled still links existing verified email', async () => {
 	const mocks = createMocks();
-	mocks.state.users.set(42, { uid: 42, username: 'local', email: 'person@example.com' });
+	mocks.state.users.set(42, { uid: 42, username: 'local', email: 'person@example.com', 'email:confirmed': 1 });
 	mocks.state.emailToUid.set('person@example.com', 42);
 	const { identity, restore } = loadIdentity(mocks);
 	try {
 		const result = await identity.resolve(
 			verified(),
-			{ issuer: 'https://id.example.com', allowAccountCreation: false }
+			{ issuer: 'https://id.example.com', allowAccountCreation: false, accountLinkingPolicy: 'trusted_email_auto_link' }
 		);
 		assert.equal(result.uid, 42);
 		assert.equal(mocks.state.users.size, 1);
@@ -482,14 +546,14 @@ test('account creation disabled still links existing verified email', async () =
 	}
 });
 
-test('email race during user creation links existing verified email without duplicate', async () => {
+test('trusted email race during user creation links existing verified email without duplicate', async () => {
 	const mocks = createMocks();
 	let createdDuringRace = false;
 	const originalCreate = mocks.user.create;
 	mocks.user.create = async (data, opts) => {
 		if (!createdDuringRace) {
 			createdDuringRace = true;
-			mocks.state.users.set(42, { uid: 42, username: 'race', email: data.email });
+			mocks.state.users.set(42, { uid: 42, username: 'race', email: data.email, 'email:confirmed': 1 });
 			mocks.state.emailToUid.set(data.email.toLowerCase(), 42);
 			throw new Error('[[error:email-taken]]');
 		}
@@ -497,7 +561,10 @@ test('email race during user creation links existing verified email without dupl
 	};
 	const { identity, restore } = loadIdentity(mocks);
 	try {
-		const result = await identity.resolve(verified(), { issuer: 'https://id.example.com' });
+		const result = await identity.resolve(verified(), {
+			issuer: 'https://id.example.com',
+			accountLinkingPolicy: 'trusted_email_auto_link',
+		});
 		assert.equal(result.uid, 42);
 		assert.equal(mocks.state.users.size, 1);
 		assert.equal(mocks.state.subToUid.get('sub-1'), 42);
@@ -512,6 +579,8 @@ test('sub mapped to uid A but verified email belongs to uid B fails safely', asy
 	mocks.state.users.set(2, { uid: 2, username: 'b', email: 'person@example.com' });
 	mocks.state.emailToUid.set('person@example.com', 2);
 	mocks.state.subToUid.set('sub-1', 1);
+	mocks.state.users.get(1).authentikIssuer = 'https://id.example.com';
+	mocks.state.users.get(1).authentikSub = 'sub-1';
 	const { identity, restore } = loadIdentity(mocks);
 	try {
 		await assert.rejects(
@@ -523,16 +592,21 @@ test('sub mapped to uid A but verified email belongs to uid B fails safely', asy
 	}
 });
 
-test('stale sub mapping to deleted user is removed and verified email can link', async () => {
+test('trusted stale sub mapping to deleted user fails closed', async () => {
 	const mocks = createMocks();
 	mocks.state.users.set(42, { uid: 42, username: 'archvillainette', email: 'person@example.com' });
 	mocks.state.emailToUid.set('person@example.com', 42);
 	mocks.state.subToUid.set('sub-1', 99);
 	const { identity, restore } = loadIdentity(mocks);
 	try {
-		const result = await identity.resolve(verified(), { issuer: 'https://id.example.com' });
-		assert.equal(result.uid, 42);
-		assert.equal(mocks.state.subToUid.get('sub-1'), 42);
+		await assert.rejects(
+			identity.resolve(verified(), {
+				issuer: 'https://id.example.com',
+				accountLinkingPolicy: 'trusted_email_auto_link',
+			}),
+			/mapping points to a missing account/
+		);
+		assert.equal(mocks.state.subToUid.get('sub-1'), 99);
 	} finally {
 		restore();
 	}
@@ -560,6 +634,217 @@ test('string email_verified does not pass strict validation', async () => {
 			identity.resolve(verified({ email_verified: 'true' }), { issuer: 'https://id.example.com' }),
 			/email must be verified/
 		);
+	} finally {
+		restore();
+	}
+});
+
+test('matching verified email does not auto-link existing local account by default', async () => {
+	const mocks = createMocks();
+	mocks.state.users.set(42, {
+		uid: 42,
+		username: 'local-admin',
+		email: 'person@example.com',
+		'email:confirmed': 1,
+	});
+	mocks.state.emailToUid.set('person@example.com', 42);
+	const { identity, restore } = loadIdentity(mocks);
+	try {
+		const result = await identity.resolve(verified(), {
+			issuer: 'https://id.example.com',
+			allowAccountCreation: true,
+		});
+		assert.notEqual(result.uid, 42);
+		assert.equal(mocks.state.users.size, 2);
+		assert.equal(mocks.state.users.get(42).authentikSub, undefined);
+		assert.equal(mocks.state.users.get(result.uid).authentikSub, 'sub-1');
+	} finally {
+		restore();
+	}
+});
+
+test('account creation disabled rejects matching verified email instead of auto-linking', async () => {
+	const mocks = createMocks();
+	mocks.state.users.set(42, { uid: 42, username: 'local', email: 'person@example.com' });
+	mocks.state.emailToUid.set('person@example.com', 42);
+	const { identity, restore } = loadIdentity(mocks);
+	try {
+		await assert.rejects(
+			identity.resolve(verified(), {
+				issuer: 'https://id.example.com',
+				allowAccountCreation: false,
+			}),
+			/SSO account creation is disabled/
+		);
+		assert.equal(mocks.state.users.get(42).authentikSub, undefined);
+	} finally {
+		restore();
+	}
+});
+
+test('same sub under different issuer does not resolve legacy issuer mapping', async () => {
+	const mocks = createMocks();
+	mocks.state.users.set(42, {
+		uid: 42,
+		username: 'linked',
+		email: 'linked@example.com',
+		authentikSub: 'shared-sub',
+		authentikIssuer: 'https://issuer-a.example.com',
+	});
+	mocks.state.emailToUid.set('linked@example.com', 42);
+	mocks.state.subToUid.set('shared-sub', 42);
+	const { identity, restore } = loadIdentity(mocks);
+	try {
+		const result = await identity.resolve(verified({
+			sub: 'shared-sub',
+			email: 'new@example.com',
+			preferred_username: 'new-person',
+		}), {
+			issuer: 'https://issuer-b.example.com',
+			allowAccountCreation: true,
+		});
+		assert.notEqual(result.uid, 42);
+		assert.equal(mocks.state.users.get(42).authentikIssuer, 'https://issuer-a.example.com');
+		assert.equal(mocks.state.users.get(result.uid).authentikIssuer, 'https://issuer-b.example.com');
+	} finally {
+		restore();
+	}
+});
+
+test('stale subject mapping to missing user fails closed', async () => {
+	const mocks = createMocks();
+	mocks.state.users.set(42, { uid: 42, username: 'other', email: 'person@example.com' });
+	mocks.state.emailToUid.set('person@example.com', 42);
+	mocks.state.subToUid.set('sub-1', 99);
+	const { identity, restore } = loadIdentity(mocks);
+	try {
+		await assert.rejects(
+			identity.resolve(verified(), { issuer: 'https://id.example.com' }),
+			/mapping points to a missing account/
+		);
+		assert.equal(mocks.state.subToUid.get('sub-1'), 99);
+		assert.equal(mocks.state.users.get(42).authentikSub, undefined);
+	} finally {
+		restore();
+	}
+});
+
+test('banned linked user is rejected before SSO success', async () => {
+	const mocks = createMocks();
+	mocks.state.users.set(42, {
+		uid: 42,
+		username: 'banned',
+		email: 'person@example.com',
+		authentikSub: 'sub-1',
+		authentikIssuer: 'https://id.example.com',
+		banned: 1,
+	});
+	mocks.state.emailToUid.set('person@example.com', 42);
+	mocks.state.subToUid.set('sub-1', 42);
+	const { identity, restore } = loadIdentity(mocks);
+	try {
+		await assert.rejects(
+			identity.resolve(verified(), { issuer: 'https://id.example.com' }),
+			/NodeBB account is restricted/
+		);
+	} finally {
+		restore();
+	}
+});
+
+test('suspended linked user is rejected before SSO success', async () => {
+	const mocks = createMocks();
+	mocks.state.users.set(42, {
+		uid: 42,
+		username: 'suspended',
+		email: 'person@example.com',
+		authentikSub: 'sub-1',
+		authentikIssuer: 'https://id.example.com',
+		suspended: 1,
+	});
+	mocks.state.emailToUid.set('person@example.com', 42);
+	mocks.state.subToUid.set('sub-1', 42);
+	const { identity, restore } = loadIdentity(mocks);
+	try {
+		await assert.rejects(
+			identity.resolve(verified(), { issuer: 'https://id.example.com' }),
+			/NodeBB account is restricted/
+		);
+	} finally {
+		restore();
+	}
+});
+
+test('disabled trusted email target is rejected before auto-linking', async () => {
+	const mocks = createMocks();
+	mocks.state.users.set(42, {
+		uid: 42,
+		username: 'disabled',
+		email: 'person@example.com',
+		'email:confirmed': 1,
+		disabled: true,
+	});
+	mocks.state.emailToUid.set('person@example.com', 42);
+	const { identity, restore } = loadIdentity(mocks);
+	try {
+		await assert.rejects(
+			identity.resolve(verified(), {
+				issuer: 'https://id.example.com',
+				accountLinkingPolicy: 'trusted_email_auto_link',
+			}),
+			/NodeBB account is restricted/
+		);
+		assert.equal(mocks.state.users.get(42).authentikSub, undefined);
+	} finally {
+		restore();
+	}
+});
+
+test('trusted email auto-link blocks local admin accounts', async () => {
+	const mocks = createMocks();
+	mocks.state.users.set(42, {
+		uid: 42,
+		username: 'admin',
+		email: 'person@example.com',
+		'email:confirmed': 1,
+		isAdmin: 1,
+	});
+	mocks.state.emailToUid.set('person@example.com', 42);
+	const { identity, restore } = loadIdentity(mocks);
+	try {
+		await assert.rejects(
+			identity.resolve(verified(), {
+				issuer: 'https://id.example.com',
+				accountLinkingPolicy: 'trusted_email_auto_link',
+			}),
+			/Privileged accounts cannot be linked automatically/
+		);
+		assert.equal(mocks.state.users.get(42).authentikSub, undefined);
+	} finally {
+		restore();
+	}
+});
+
+test('trusted email auto-link blocks local moderator accounts', async () => {
+	const mocks = createMocks();
+	mocks.state.users.set(42, {
+		uid: 42,
+		username: 'moderator',
+		email: 'person@example.com',
+		'email:confirmed': 1,
+		isModerator: true,
+	});
+	mocks.state.emailToUid.set('person@example.com', 42);
+	const { identity, restore } = loadIdentity(mocks);
+	try {
+		await assert.rejects(
+			identity.resolve(verified(), {
+				issuer: 'https://id.example.com',
+				accountLinkingPolicy: 'trusted_email_auto_link',
+			}),
+			/Privileged accounts cannot be linked automatically/
+		);
+		assert.equal(mocks.state.users.get(42).authentikSub, undefined);
 	} finally {
 		restore();
 	}

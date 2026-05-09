@@ -54,3 +54,39 @@ test('profile sync does not blank fullname when provider omits name claim', asyn
 		restore();
 	}
 });
+
+test('profile sync rejects reserved staff-like fullnames for normal users', async () => {
+	const mocks = createMocks();
+	mocks.state.users.set(1, {
+		uid: 1,
+		username: 'linked',
+		fullname: 'Local Name',
+	});
+	const { sync, restore } = loadSync(mocks);
+	try {
+		const result = await sync.syncProfile(1, { name: 'Admin' }, { syncFullnameOnLogin: true });
+		assert.deepEqual(result.updatedFields, []);
+		assert.deepEqual(result.skippedFields, ['fullname']);
+		assert.equal(mocks.state.users.get(1).fullname, 'Local Name');
+	} finally {
+		restore();
+	}
+});
+
+test('profile sync allows reserved staff-like fullnames for privileged users only', async () => {
+	const mocks = createMocks();
+	mocks.state.users.set(1, {
+		uid: 1,
+		username: 'linked',
+		fullname: 'Local Name',
+		isAdmin: 1,
+	});
+	const { sync, restore } = loadSync(mocks);
+	try {
+		const result = await sync.syncProfile(1, { name: 'Admin' }, { syncFullnameOnLogin: true });
+		assert.deepEqual(result.updatedFields, ['fullname']);
+		assert.equal(mocks.state.users.get(1).fullname, 'Admin');
+	} finally {
+		restore();
+	}
+});

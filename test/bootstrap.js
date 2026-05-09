@@ -140,6 +140,16 @@ function createMocks() {
 				const list = Array.isArray(uids) ? uids : [uids];
 				state.revokedSessionsForUids.push(...list.map(uid => parseInt(uid, 10)));
 			},
+			async revokeSession(sessionIds, uid) {
+				const list = Array.isArray(sessionIds) ? sessionIds : [sessionIds];
+				state.revokedSessionsForUids.push(...list.map(() => parseInt(uid, 10)));
+			},
+		},
+		bans: {
+			async canLoginIfBanned(uid) {
+				const data = state.users.get(parseInt(uid, 10)) || {};
+				return !data.banned;
+			},
 		},
 	};
 
@@ -179,7 +189,7 @@ function createMocks() {
 				return;
 			}
 			if (key === 'authentik:sid:uid') {
-				state.sidToUid.set(field, parseInt(value, 10));
+				state.sidToUid.set(field, value && typeof value === 'object' ? { ...value } : parseInt(value, 10));
 				return;
 			}
 			const object = state.objects.get(key) || {};

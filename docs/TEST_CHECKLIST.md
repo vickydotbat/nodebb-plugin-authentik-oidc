@@ -7,8 +7,9 @@
 Covered baseline cases:
 
 - New verified OIDC user creates exactly one NodeBB user.
-- Same `sub` repeatedly resolves to the same uid.
-- Existing NodeBB user with same verified email links without duplicate creation.
+- Same `issuer + sub` repeatedly resolves to the same uid.
+- Existing NodeBB user with same verified email does not auto-link under the safe default.
+- Trusted verified-email auto-linking works only when the explicit migration policy is enabled, the local email is already confirmed, and the target is not an admin/moderator account.
 - Unverified email rejects without creating or linking.
 - Username conflict produces a unique username.
 - Existing `sub` with changed email still resolves by sub.
@@ -16,12 +17,12 @@ Covered baseline cases:
 - `sub` mapped to uid A but email belongs to uid B rejects, even when the emitted email is unverified.
 - Missing email rejects.
 - String `"true"` for `email_verified` rejects.
-- Optional display name sync updates `fullname` only after successful identity resolution and does not blank it when `name` is missing.
+- Optional display name sync updates `fullname` only after successful identity resolution, does not blank it when `name` is missing, and skips reserved staff/system names for non-privileged users.
 - Mapping audit reports healthy, stale, missing reverse, conflicting reverse, and duplicate user-side subject links.
-- Stale mapping repair requires explicit confirmation and removes only mappings whose uid no longer exists.
+- Stale subject mappings fail closed; stale mapping repair requires explicit confirmation.
 - Authorization parameters are appended to the provider redirect while plugin-controlled OIDC parameters cannot be overridden.
 - Username collision reject policy fails closed without creating a user or mapping.
-- Disabling new SSO account creation rejects brand-new verified users without creating a user or mapping, while verified-email linking to an existing account still works.
+- Disabling new SSO account creation rejects brand-new verified users without creating a user or mapping.
 - Last failure diagnostics store sanitized claim metadata without raw tokens or email addresses.
 - Last authorization diagnostics preserve a sanitized provider-relative clear-session return target and do not store state or nonce.
 - JWKS diagnostics report only sanitized signing-key metadata and fail when no supported signing key exists.
@@ -30,10 +31,16 @@ Covered baseline cases:
 - User linked-account state exposes safe metadata without the OIDC subject or mapping keys.
 - The profile menu link is self-only.
 - OIDC state is generated when missing, required on callback, and single-use.
-- ID token validation rejects unsupported algorithms and ignores non-signing JWKS keys.
+- Callback route requests without `code`/`state`, duplicate callback parameters, non-GET callback requests, and forced attacker-state callbacks fail before token exchange.
+- `openid-client` handles discovery, state/nonce/PKCE primitives, code grant processing, ID-token validation, and UserInfo subject checks.
+- Back-channel logout JWT verification uses `jose` with remote JWKS, issuer, audience, and algorithm checks.
+- UserInfo profile conflicts cannot override signed ID-token `preferred_username` and `name` values.
+- `openid-client`/`jose` provider fetches disable automatic redirects and reject provider redirects instead of following them.
+- Group and role claims are ignored by normalized OIDC claims while role sync remains unimplemented.
 - Back-channel logout setting saves and exposes a computed logout URL.
 - OIDC logout token validation requires the back-channel logout event and rejects nonce.
-- Back-channel logout revokes NodeBB sessions for mapped `sub` or stored `sid` only when enabled.
+- Real signed logout-token tests reject unsigned, wrong-issuer, wrong-audience, and unknown-kid tokens.
+- Back-channel logout revokes the mapped NodeBB session for stored `sid` when available, or sessions for the mapped uid for subject-only logout, only when enabled.
 - Back-channel logout accepts Authentik-style form-encoded `logout_token` request bodies.
 - Back-channel logout diagnostics record sanitized `revoked` and `unmatched` outcomes without storing raw logout tokens.
 
@@ -47,12 +54,12 @@ Covered baseline cases:
 6. Configure Authentik enrollment policies for required email and the desired duplicate email/username rejection behavior.
 7. Login with a new verified Authentik user.
 8. Login again with the same Authentik user and confirm the same uid is used.
-9. Create a local NodeBB account with the same verified email and confirm SSO links to it without duplicate creation.
+9. Create a local NodeBB account with the same verified email and confirm default SSO login does not bind that local account by email alone.
 10. Test an Authentik user with unverified email and confirm the actual OIDC claim is boolean `false` and login is rejected.
 11. Change the provider email after linking and confirm login still resolves by `sub`.
 12. Create a deliberate sub/email collision and confirm login fails closed with a warning log.
 13. Disable new SSO account creation and confirm a brand-new verified Authentik user is rejected without a NodeBB user or mapping.
-14. With new SSO account creation still disabled, confirm an existing NodeBB account with the same verified email links successfully.
+14. With new SSO account creation still disabled, confirm an existing NodeBB account with the same verified email is not linked unless the trusted verified-email migration policy is explicitly enabled, the local email is already confirmed, and the target account is not privileged.
 
 ## Manual Back-Channel Logout
 
@@ -90,14 +97,14 @@ Troubleshooting:
 - Re-run ACP discovery and save settings after issuer-handling changes.
 - Test in both a clean/incognito browser and a browser with an active different Authentik/NodeBB session so session-contamination behavior is visible.
 - For brand-new Authentik enrollment with no verified-email match, confirm Authentik does not show another user's NodeBB avatar/current-session profile and NodeBB creates a clean user only after verified claims resolve safely.
-- For verified-email linking to an existing NodeBB account, confirm preserving/showing that existing NodeBB account's avatar is acceptable and that the resolved uid is exactly the account whose verified email matched.
+- For trusted verified-email migration mode, confirm preserving/showing an existing NodeBB account's avatar happens only after the explicit policy resolves to that exact non-privileged uid with pre-confirmed local email.
 - Use ACP Last authorization after each session-contamination test and record whether the plugin used direct authorization, OIDC end-session, or an Authentik invalidation/logout flow override.
 - When using an Authentik invalidation/logout flow override with `next`, confirm Last authorization shows `returnTo` as a provider-relative `/application/o/authorize/...` URL with state and nonce removed.
 - Capture the Authentik `sub`, email, `email_verified`, and preferred username for each live test account.
-- Confirm the NodeBB database has subject mappings for the successful login: `authentik:sub:uid` contains the `sub`, the direct `authentik:sub:<sub>` key points to the same uid, and the target user has `authentikSub`, `authentikIssuer`, `authentikLinkedAt`, and `authentikLastLoginAt`.
+- Confirm the NodeBB database has issuer-qualified subject mappings for the successful login and the target user has `authentikSub`, `authentikIssuer`, `authentikLinkedAt`, and `authentikLastLoginAt`.
 - Confirm repeated login with the same Authentik account returns to the same NodeBB uid and does not create another account.
 - Confirm an Authentik email change after linking still logs into the originally linked NodeBB account by `sub`.
-- Confirm an existing local NodeBB account with a verified matching email links without duplicate account creation.
+- Confirm an existing local NodeBB account with a verified matching email links without duplicate account creation only in trusted migration mode with a pre-confirmed local email and non-privileged target account.
 - Confirm unverified or missing email claims fail closed and leave no new user or mapping behind.
 - Confirm a deliberate `sub`/email collision fails closed and logs a warning.
 - In ACP, run Identity Mapping Diagnostics and confirm the audit summary matches the database.
@@ -107,6 +114,11 @@ Troubleshooting:
 - Configure Authentik self-service profile, password, MFA, and session URLs in the ACP and confirm `/user/<userslug>/authentik-oidc` shows only those external actions for the signed-in linked user.
 - Confirm the linked-account page does not display the OIDC `sub`, raw claims, tokens, or database mapping keys.
 - Complete the Manual Back-Channel Logout section above and record whether Authentik sent the logout token, how NodeBB responded, and whether the existing browser session was actually revoked.
+- Confirm a successful OIDC login regenerates the pre-login anonymous NodeBB session id.
+- Confirm production session cookies are HttpOnly, Secure, and SameSite=Lax or a reviewed equivalent.
+- Confirm NodeBB admin mutation routes reject POSTs without CSRF tokens.
+- Confirm NodeBB callback route registration rejects or never dispatches POST `/auth/authentik/callback`.
+- Confirm clustered NodeBB uses a shared session store; callback state must fail closed rather than falling back to process memory if sessions are not shared.
 
 ## Manual Observations
 
@@ -142,3 +154,4 @@ Troubleshooting:
 - Add an Authentik-side cleanup policy or admin runbook for inactive enrollment users whose email verification expires before completion, especially because they reserve usernames and may require manual deletion or recovery.
 - Live-test the linked-account profile page after rebuilding NodeBB and confirm the self-only profile menu route renders under the active theme.
 - Live-test NodeBB session revocation after upstream Authentik logout/session closure with Authentik back-channel logout enabled, including verification that Authentik POSTed a `logout_token` to NodeBB.
+- Live-test NodeBB session regeneration, cookie attributes, admin POST CSRF behavior, and callback method handling in the target NodeBB 4.x install.

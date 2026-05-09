@@ -1,16 +1,17 @@
 # nodebb-plugin-authentik-oidc
 
-Authentik-compatible OAuth2/OIDC SSO for NodeBB with strict verified-email identity linking.
+Authentik-compatible OAuth2/OIDC SSO for NodeBB with issuer-qualified OIDC identity mapping.
 
 ## Features
 
 - Adds `/auth/authentik` and `/auth/authentik/callback` through NodeBB's SSO strategy flow.
-- Uses OIDC `sub` as the permanent external identity.
-- Links existing NodeBB users by email only when `email_verified === true`.
+- Uses exact OIDC `issuer + sub` as the permanent external identity.
+- Does not auto-link existing local NodeBB accounts by email unless the explicit trusted-email migration policy is enabled.
+- Trusted-email migration requires a pre-confirmed local email and blocks local admin/moderator accounts.
 - Rejects missing email for all identities and rejects unverified email for unlinked identities.
 - Rejects `sub`/email collisions instead of silently creating duplicate users.
 - Keeps username display-only and never uses it for identity matching.
-- Can run in link-only mode by disabling new SSO account creation while still allowing verified-email links to existing NodeBB users.
+- Can run in link-only mode by disabling new SSO account creation so only already-linked OIDC subjects can log in.
 - Provides an ACP settings page with issuer discovery, secret-preserving saves, authorization parameters, username collision policy, sanitized last-failure diagnostics, mapping audit, and stale mapping repair.
 - Provides a read-only user account page for linked Authentik/OIDC status and optional Authentik self-service links without exposing OIDC subjects or mapping keys.
 - Supports optional OIDC back-channel logout so Authentik session closure can revoke NodeBB sessions.
@@ -57,6 +58,8 @@ Create an Authentik OAuth2/OpenID provider:
 
 Use the issuer URL from Authentik in the plugin settings and click Discover to populate endpoints. For Authentik-side enrollment, email-verification, duplicate-account, account-selection, and logout guidance, see [Authentik setup and enrollment hardening](docs/AUTHENTIK_SETUP.md).
 
+PKCE is always enabled and cannot be disabled from the ACP. The plugin rejects `offline_access` scopes because refresh tokens are not used or stored. Confidential-client token exchange defaults to `client_secret_basic`; use `client_secret_post` only if the provider requires it. ID and logout token signing algorithms default to `RS256`; pin another supported asymmetric algorithm only if Authentik is configured to use it.
+
 Optional provider authorization parameters can be configured as a query string, for example:
 
 ```text
@@ -75,32 +78,36 @@ Authentik 2025.10 and newer default the standard email scope's `email_verified` 
 
 If testing unverified email behavior, inspect the actual OIDC ID token or userinfo response. Authentik custom attributes do not necessarily change the emitted `email_verified` claim.
 
-Use Identity Mapping Diagnostics in the ACP to audit subject mappings. The plugin writes both the auditable `authentik:sub:uid` object mapping and the direct `authentik:sub:<sub>` lookup key for compatibility; the repair action only removes stale subject mappings that point to missing NodeBB users and requires confirmation.
+Use Identity Mapping Diagnostics in the ACP to audit subject mappings. New logins are keyed by exact `issuer + sub`; legacy `sub`-only mappings are read only when the linked user's stored issuer exactly matches the current issuer. Stale mappings to missing users fail closed and require explicit admin repair.
 
 Use Last failure in the ACP diagnostics section when an OIDC callback is rejected. It stores only sanitized metadata such as rejection code, claim presence, `email_verified` type/value, issuer metadata, and whether userinfo was used. It does not store raw tokens, authorization codes, full claim payloads, or email addresses.
 
 Use Last authorization when debugging Authentik session/avatar contamination. For clear-session preflight requests it records the sanitized provider logout/invalidation target, the configured return parameter, and whether the return target was converted to a provider-relative authorization URL.
 
-Provider URLs and self-service links must be HTTPS by default and cannot target localhost or private network addresses. The loopback HTTP exception is only for explicit local development.
+Provider URLs and self-service links must be HTTPS by default and cannot target localhost or private network addresses. The callback HTTP exception and provider-loopback HTTP exception are separate local-development controls; keep both disabled in production.
 
 The username collision policy defaults to creating a safe unique NodeBB username for new SSO users. Set it to reject if new SSO account creation should fail when the provider's display username conflicts with an existing NodeBB username/userslug.
 
-Disable new SSO account creation when the forum should accept only users who already have a linked Authentik subject or an existing NodeBB account with the same verified email. This does not weaken verified-email linking; it only blocks brand-new NodeBB user creation.
+Disable new SSO account creation when the forum should accept only users who already have a linked Authentik subject. A verified email match alone does not bind a new OIDC subject to an existing local account under the default policy. The trusted verified-email migration policy is intentionally narrower: the local account email must already be confirmed, and privileged local accounts are not linked automatically.
 
 Optional Authentik self-service URLs can be configured in the ACP. When set, linked users see those external profile, password, MFA, and session-management links on `/user/<userslug>/authentik-oidc`.
 
-Closing sessions from Authentik requires Authentik Single Logout to be configured. Enable OIDC back-channel logout in this plugin's ACP page, configure the displayed back-channel logout URL as the Authentik provider's Logout URI, set Logout Method to Back-channel, and ensure Authentik can reach the NodeBB public URL. The plugin validates the signed logout token and revokes NodeBB sessions for the linked `sub` or stored OIDC `sid`.
+Closing sessions from Authentik requires Authentik Single Logout to be configured. Enable OIDC back-channel logout in this plugin's ACP page, configure the displayed back-channel logout URL as the Authentik provider's Logout URI, set Logout Method to Back-channel, and ensure Authentik can reach the NodeBB public URL. The plugin validates the signed logout token and revokes the mapped NodeBB session for a stored OIDC `sid` when possible, falling back to uid-wide revocation for subject-only logout.
 
 Back-channel logout is triggered only when Authentik terminates the user session and identifies an active OIDC provider session for NodeBB. Revoking consent for the NodeBB application is not a logout signal by itself. If deleting an Authentik session does not log the user out of NodeBB, open the plugin ACP diagnostics and click Last logout:
 
 - No record: Authentik did not POST to NodeBB, or the request did not reach NodeBB.
 - `outcome: rejected`: Authentik called NodeBB, but logout-token validation failed. Check issuer, client id/audience, JWKS URI, and signing key support.
 - `outcome: unmatched`: the logout token was valid, but its `sub`/`sid` did not match a stored NodeBB mapping. Log into NodeBB through Authentik again, then retry.
-- `outcome: revoked`: NodeBB revoked all sessions for the mapped uid. Refresh the browser or try a protected action to confirm the old session is gone.
+- `outcome: revoked`: NodeBB revoked the mapped session or, for subject-only logout, sessions for the mapped uid. Refresh the browser or try a protected action to confirm the old session is gone.
 
 After changing Authentik logout settings, log out of NodeBB and log back in through Authentik once so Authentik and the plugin both have a fresh provider-session record.
 
-Display name synchronization is disabled by default. When enabled, successful SSO logins update NodeBB `fullname` from the provider's OIDC `name` claim after the account has already been resolved by `sub` or verified email. Missing `name` claims do not blank the local field.
+Display name synchronization is disabled by default. When enabled, successful SSO logins update NodeBB `fullname` from the provider's OIDC `name` claim after the account has already been resolved by issuer-qualified `sub`. Missing `name` claims do not blank the local field, and reserved staff/system names are skipped for non-privileged users.
+
+Clustered NodeBB deployments must use a shared NodeBB session store. OIDC state, nonce, and PKCE verifier data live in the user's NodeBB session and deliberately have no process-memory fallback.
+
+For production, prefer setting `AUTHENTIK_OIDC_CLIENT_SECRET` in the environment instead of storing the OAuth client secret only in NodeBB plugin settings. If using ACP-stored secrets, protect NodeBB database backups and settings exports as sensitive material.
 
 ## Tests
 
