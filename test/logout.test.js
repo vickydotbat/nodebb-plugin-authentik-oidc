@@ -174,6 +174,41 @@ test('back-channel logout with sid revokes only mapped NodeBB session when avail
 	}
 });
 
+test('back-channel logout diagnostics record tracked session counts around revocation', async () => {
+	const mocks = createMocks();
+	mocks.state.subToUid.set('sub-1', 42);
+	mocks.state.users.set(42, { uid: 42, username: 'linked' });
+	mocks.state.settings.set('authentik-oidc', {
+		backchannelLogoutEnabled: true,
+		clientId: 'nodebb',
+		issuer: 'https://auth.example.com/application/o/nodebb/',
+		jwksUri: 'https://auth.example.com/jwks/',
+	});
+	const activeSessions = ['session-1'];
+	mocks.user.auth.getSessions = async () => activeSessions;
+	mocks.user.auth.revokeAllSessions = async (uid) => {
+		mocks.state.revokedSessionsForUids.push(parseInt(uid, 10));
+		activeSessions.length = 0;
+	};
+	const { logout, restore } = loadLogout(mocks, { sub: 'sub-1' });
+	try {
+		const res = response();
+		await logout.handleBackchannelLogout({
+			body: { logout_token: 'signed-token' },
+			query: {},
+		}, res);
+		const diagnostics = require('../lib/diagnostics');
+		const event = await diagnostics.getLastLogoutEvent();
+
+		assert.equal(res.statusCode, 204);
+		assert.equal(event.outcome, 'revoked');
+		assert.equal(event.sessionsBefore, 1);
+		assert.equal(event.sessionsAfter, 0);
+	} finally {
+		restore();
+	}
+});
+
 test('back-channel logout does not revoke sessions while disabled', async () => {
 	const mocks = createMocks();
 	mocks.state.subToUid.set('sub-1', 42);

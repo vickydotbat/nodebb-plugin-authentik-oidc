@@ -146,6 +146,8 @@ define('admin/plugins/authentik-oidc', ['alerts'], function (alerts) {
 			hasSid: result.hasSid,
 			uid: result.uid,
 			source: result.source,
+			sessionsBefore: result.sessionsBefore,
+			sessionsAfter: result.sessionsAfter,
 			code: result.code,
 			message: result.message,
 			statusCode: result.statusCode,
