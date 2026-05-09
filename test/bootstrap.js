@@ -159,16 +159,32 @@ function createMocks() {
 			object[field] = value;
 			state.objects.set(key, object);
 		},
+		async incrObjectField(key, field) {
+			const object = state.objects.get(key) || {};
+			const next = (parseInt(object[field], 10) || 0) + 1;
+			object[field] = next;
+			state.objects.set(key, object);
+			return next;
+		},
 		async deleteObjectField(key, field) {
 			if (key === 'authentik:sub:uid') {
 				state.subToUid.delete(field);
+				return;
 			}
 			if (key.startsWith('authentik:sub:') && field === 'uid') {
 				state.directSubToUid.delete(key.slice('authentik:sub:'.length));
+				return;
 			}
 			if (key === 'authentik:sid:uid') {
 				state.sidToUid.delete(field);
+				return;
 			}
+			const object = state.objects.get(key) || {};
+			delete object[field];
+			state.objects.set(key, object);
+		},
+		async deleteObjectFields(key, fields) {
+			await Promise.all(fields.map(field => this.deleteObjectField(key, field)));
 		},
 		async getSortedSetRange(key, start, stop) {
 			if (key === 'users:joindate') {

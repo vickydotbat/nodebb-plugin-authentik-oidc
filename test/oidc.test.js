@@ -50,7 +50,7 @@ function loadOidcWithJwks(keys) {
 	};
 }
 
-function loadOidcForIdToken({ header, keys }) {
+function loadOidcForIdToken({ header, keys, claims }) {
 	const originalLoad = Module._load;
 	Module._load = function (request, parent, isMain) {
 		if (request === 'jsonwebtoken') {
@@ -59,7 +59,7 @@ function loadOidcForIdToken({ header, keys }) {
 					return { header };
 				},
 				verify() {
-					return { sub: 'sub-1', nonce: 'nonce-1' };
+					return claims || { sub: 'sub-1', nonce: 'nonce-1' };
 				},
 			};
 		}
@@ -342,6 +342,127 @@ test('ID token verification ignores non-signing keys with matching kid', async (
 				issuer: 'https://auth.example.com/application/o/nodebb/',
 			}, 'token', 'nonce-1'),
 			/Unable to find OIDC signing key/
+		);
+	} finally {
+		restore();
+	}
+});
+
+test('ID token verification rejects multi-audience token without matching authorized party', async () => {
+	const { publicKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
+	const signingJwk = publicKey.export({ format: 'jwk' });
+	signingJwk.kid = 'signing-key';
+	signingJwk.use = 'sig';
+	signingJwk.alg = 'RS256';
+
+	const { oidc, restore } = loadOidcForIdToken({
+		header: { alg: 'RS256', kid: 'signing-key' },
+		keys: [signingJwk],
+		claims: {
+			sub: 'sub-1',
+			nonce: 'nonce-1',
+			aud: ['nodebb', 'other-client'],
+			azp: 'other-client',
+		},
+	});
+	try {
+		await assert.rejects(
+			oidc.verifyIdToken({
+				jwksUri: 'https://auth.example.com/jwks/',
+				clientId: 'nodebb',
+				issuer: 'https://auth.example.com/application/o/nodebb/',
+			}, 'token', 'nonce-1'),
+			/authorized party/
+		);
+	} finally {
+		restore();
+	}
+});
+
+test('ID token verification rejects single-audience token with mismatched authorized party', async () => {
+	const { publicKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
+	const signingJwk = publicKey.export({ format: 'jwk' });
+	signingJwk.kid = 'signing-key';
+	signingJwk.use = 'sig';
+	signingJwk.alg = 'RS256';
+
+	const { oidc, restore } = loadOidcForIdToken({
+		header: { alg: 'RS256', kid: 'signing-key' },
+		keys: [signingJwk],
+		claims: {
+			sub: 'sub-1',
+			nonce: 'nonce-1',
+			aud: 'nodebb',
+			azp: 'other-client',
+		},
+	});
+	try {
+		await assert.rejects(
+			oidc.verifyIdToken({
+				jwksUri: 'https://auth.example.com/jwks/',
+				clientId: 'nodebb',
+				issuer: 'https://auth.example.com/application/o/nodebb/',
+			}, 'token', 'nonce-1'),
+			/authorized party/
+		);
+	} finally {
+		restore();
+	}
+});
+
+test('ID token verification accepts multi-audience token with matching authorized party', async () => {
+	const { publicKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
+	const signingJwk = publicKey.export({ format: 'jwk' });
+	signingJwk.kid = 'signing-key';
+	signingJwk.use = 'sig';
+	signingJwk.alg = 'RS256';
+
+	const { oidc, restore } = loadOidcForIdToken({
+		header: { alg: 'RS256', kid: 'signing-key' },
+		keys: [signingJwk],
+		claims: {
+			sub: 'sub-1',
+			nonce: 'nonce-1',
+			aud: ['nodebb', 'other-client'],
+			azp: 'nodebb',
+		},
+	});
+	try {
+		const claims = await oidc.verifyIdToken({
+			jwksUri: 'https://auth.example.com/jwks/',
+			clientId: 'nodebb',
+			issuer: 'https://auth.example.com/application/o/nodebb/',
+		}, 'token', 'nonce-1');
+		assert.equal(claims.sub, 'sub-1');
+	} finally {
+		restore();
+	}
+});
+
+test('claim merging rejects conflicting email verification values', () => {
+	const { oidc, restore } = loadOidc();
+	try {
+		assert.throws(
+			() => oidc.mergeClaims(
+				{ sub: 'sub-1', email: 'person@example.com', email_verified: false },
+				{ sub: 'sub-1', email: 'person@example.com', email_verified: true }
+			),
+			/email verification/
+		);
+	} finally {
+		restore();
+	}
+});
+
+test('claim merging rejects conflicting email values', () => {
+	const { oidc, restore } = loadOidc();
+	try {
+		assert.throws(
+			() => oidc.mergeClaims(
+				{ sub: 'sub-1', email: 'person@example.com', email_verified: true },
+				{ sub: 'sub-1', email: 'other@example.com', email_verified: true }
+			),
+			/email claims do not match/
 		);
 	} finally {
 		restore();

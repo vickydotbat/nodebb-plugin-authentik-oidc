@@ -200,3 +200,23 @@ test('provider URLs reject private network targets by default', () => {
 		restore();
 	}
 });
+
+test('development HTTP override still rejects private HTTPS provider targets', () => {
+	const mocks = createMocks();
+	const { config, restore } = loadConfig(mocks);
+	try {
+		assert.doesNotThrow(
+			() => config.assertSafeUrl('http://localhost:4567/auth/authentik/callback', 'callbackUrl', { allowHttp: true })
+		);
+		assert.throws(
+			() => config.assertSafeUrl('https://127.0.0.1:9443/application/o/nodebb/', 'issuer', { allowHttp: true }),
+			/Must not target localhost or private network addresses/
+		);
+		assert.throws(
+			() => config.assertSafeUrl('https://192.168.1.20/application/o/nodebb/', 'issuer', { allowHttp: true }),
+			/Must not target localhost or private network addresses/
+		);
+	} finally {
+		restore();
+	}
+});
