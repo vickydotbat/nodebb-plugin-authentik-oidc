@@ -145,7 +145,7 @@ plugin.initAuth = async function (strategies) {
 		},
 		color: '#fd4b2d',
 		scope: settings.scopes || config.DEFAULTS.scopes,
-		checkState: true,
+		checkState: false,
 	});
 	return strategies;
 };

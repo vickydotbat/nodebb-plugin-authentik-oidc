@@ -28,12 +28,24 @@ function loadLibrary(mocks, helpers) {
 		}
 		return originalLoad.call(this, request, parent, isMain);
 	};
-	delete require.cache[require.resolve('../library')];
+	[
+		'../lib/config',
+		'../lib/strategy',
+		'../library',
+	].forEach((modulePath) => {
+		delete require.cache[require.resolve(modulePath)];
+	});
 	const library = require('../library');
 	return {
 		library,
 		restore() {
-			delete require.cache[require.resolve('../library')];
+			[
+				'../lib/config',
+				'../lib/strategy',
+				'../library',
+			].forEach((modulePath) => {
+				delete require.cache[require.resolve(modulePath)];
+			});
 			Module._load = originalLoad;
 			restoreNodebb();
 		},
@@ -124,6 +136,24 @@ test('app init registers login/register intercepts and back-channel logout route
 		assert.equal(typeof getRoutes[0].handler, 'function');
 		assert.equal(typeof getRoutes[1].handler, 'function');
 		assert.equal(typeof postRoutes[0].handler, 'function');
+	} finally {
+		restore();
+	}
+});
+
+test('auth strategy disables NodeBB outer state check because plugin validates OIDC state', async () => {
+	const mocks = createMocks();
+	mocks.state.settings.set('authentik-oidc', {
+		enabled: true,
+		displayName: 'Authentik',
+		scopes: 'openid email profile',
+	});
+	const { library, restore } = loadLibrary(mocks);
+	try {
+		const strategies = await library.initAuth([]);
+		assert.equal(strategies.length, 1);
+		assert.equal(strategies[0].name, 'authentik');
+		assert.equal(strategies[0].checkState, false);
 	} finally {
 		restore();
 	}
