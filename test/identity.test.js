@@ -13,6 +13,17 @@ function loadIdentity(mocks) {
 	return { identity, restore };
 }
 
+function loadIdentityInstances(mocks, count) {
+	const restore = installNodebbMocks(mocks);
+	delete require.cache[require.resolve('../lib/logger')];
+	const identities = [];
+	for (let i = 0; i < count; i += 1) {
+		delete require.cache[require.resolve('../lib/identity')];
+		identities.push(require('../lib/identity'));
+	}
+	return { identities, restore };
+}
+
 function verified(overrides = {}) {
 	return {
 		sub: 'sub-1',
@@ -235,6 +246,53 @@ test('existing user with same verified email links without duplicate', async () 
 		assert.equal(mocks.state.subToUid.get('sub-1'), 42);
 	} finally {
 		restore();
+	}
+});
+
+test('concurrent verified-email links with different subjects fail closed', async () => {
+	const mocks = createMocks();
+	mocks.state.users.set(42, { uid: 42, username: 'local', email: 'person@example.com' });
+	mocks.state.emailToUid.set('person@example.com', 42);
+	const { identity, restore } = loadIdentity(mocks);
+	try {
+		const results = await Promise.allSettled([
+			identity.resolve(verified({ sub: 'sub-1' }), { issuer: 'https://id.example.com' }),
+			identity.resolve(verified({ sub: 'sub-2' }), { issuer: 'https://id.example.com' }),
+		]);
+		assert.equal(results.filter(result => result.status === 'fulfilled').length, 1);
+		assert.equal(results.filter(result => result.status === 'rejected').length, 1);
+		assert.match(
+			results.find(result => result.status === 'rejected').reason.message,
+			/different OIDC subject|concurrent/i
+		);
+		assert.equal([...mocks.state.subToUid.keys()].length, 1);
+		assert.equal(mocks.state.users.get(42).authentikSub, [...mocks.state.subToUid.keys()][0]);
+	} finally {
+		restore();
+	}
+});
+
+test('concurrent verified-email links from separate module instances fail closed', async () => {
+	const mocks = createMocks();
+	mocks.state.users.set(42, { uid: 42, username: 'local', email: 'person@example.com' });
+	mocks.state.emailToUid.set('person@example.com', 42);
+	const { identities, restore } = loadIdentityInstances(mocks, 2);
+	try {
+		const results = await Promise.allSettled([
+			identities[0].resolve(verified({ sub: 'sub-1' }), { issuer: 'https://id.example.com' }),
+			identities[1].resolve(verified({ sub: 'sub-2' }), { issuer: 'https://id.example.com' }),
+		]);
+		assert.equal(results.filter(result => result.status === 'fulfilled').length, 1);
+		assert.equal(results.filter(result => result.status === 'rejected').length, 1);
+		assert.match(
+			results.find(result => result.status === 'rejected').reason.message,
+			/different OIDC subject|concurrent/i
+		);
+		assert.equal([...mocks.state.subToUid.keys()].length, 1);
+		assert.equal(mocks.state.users.get(42).authentikSub, [...mocks.state.subToUid.keys()][0]);
+	} finally {
+		restore();
+		delete require.cache[require.resolve('../lib/identity')];
 	}
 });
 

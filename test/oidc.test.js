@@ -605,6 +605,39 @@ test('logout token verification accepts signed back-channel logout event', async
 	}
 });
 
+test('logout token verification rejects stale issued-at values', async () => {
+	const { publicKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
+	const signingJwk = publicKey.export({ format: 'jwk' });
+	signingJwk.kid = 'signing-key';
+	signingJwk.use = 'sig';
+	signingJwk.alg = 'RS256';
+
+	const { oidc, restore } = loadOidcForLogoutToken({
+		header: { alg: 'RS256', kid: 'signing-key' },
+		keys: [signingJwk],
+		claims: {
+			sub: 'sub-1',
+			iat: Math.floor((Date.now() - (11 * 60 * 1000)) / 1000),
+			jti: 'logout-1',
+			events: {
+				'http://schemas.openid.net/event/backchannel-logout': {},
+			},
+		},
+	});
+	try {
+		await assert.rejects(
+			oidc.verifyLogoutToken({
+				jwksUri: 'https://auth.example.com/jwks/',
+				clientId: 'nodebb',
+				issuer: 'https://auth.example.com/application/o/nodebb/',
+			}, 'logout-token'),
+			/issued-at is outside/
+		);
+	} finally {
+		restore();
+	}
+});
+
 test('logout token verification rejects missing logout event', async () => {
 	const { publicKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
 	const signingJwk = publicKey.export({ format: 'jwk' });

@@ -6,7 +6,7 @@ const EventEmitter = require('node:events');
 const Module = require('node:module');
 
 function loadHttp({
-	lookup = async () => [{ address: '203.0.113.10', family: 4 }],
+	lookup = async () => [{ address: '93.184.216.34', family: 4 }],
 	httpsRequest = createRequestMock([{ body: '{}' }]).request,
 	httpRequest = createRequestMock([{ body: '{}' }]).request,
 } = {}) {
@@ -115,7 +115,7 @@ test('requestJson rejects private addresses returned by the connection lookup', 
 		lookup: async () => {
 			lookupCount += 1;
 			return lookupCount === 1 ?
-				[{ address: '203.0.113.10', family: 4 }] :
+				[{ address: '93.184.216.34', family: 4 }] :
 				{ address: '10.0.0.10', family: 4 };
 		},
 		httpsRequest: requestMock.request,
@@ -245,5 +245,33 @@ test('requestJson rejects full IPv6 link-local range DNS results', async () => {
 		assert.equal(requestMock.calls.length, 0);
 	} finally {
 		restore();
+	}
+});
+
+test('requestJson rejects additional non-global DNS result ranges', async () => {
+	for (const address of [
+		'0.1.2.3',
+		'100.64.0.1',
+		'198.18.0.1',
+		'224.0.0.1',
+		'255.255.255.255',
+		'2001:db8::1',
+		'2001:0db8::1',
+		'ff02::1',
+	]) {
+		const requestMock = createRequestMock([{ body: '{}' }]);
+		const { http, restore } = loadHttp({
+			lookup: async () => [{ address, family: address.includes(':') ? 6 : 4 }],
+			httpsRequest: requestMock.request,
+		});
+		try {
+			await assert.rejects(
+				http.requestJson('https://auth.example.com/.well-known/openid-configuration'),
+				/private network addresses/
+			);
+			assert.equal(requestMock.calls.length, 0);
+		} finally {
+			restore();
+		}
 	}
 });

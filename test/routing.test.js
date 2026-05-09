@@ -74,6 +74,43 @@ test('anonymous register redirect preserves requested next target', async () => 
 	}
 });
 
+test('anonymous register redirect drops unsafe requested next targets', async () => {
+	const mocks = createMocks();
+	mocks.meta.config = {};
+	mocks.state.settings.set('authentik-oidc', {
+		enabled: true,
+	});
+	const { routing, restore } = loadRouting(mocks);
+	try {
+		for (const nextTarget of [
+			'https://evil.example/phish',
+			'//evil.example/phish',
+			'/\\evil.example/phish',
+			'/topic/123\r\nlocation:https://evil.example',
+		]) {
+			let redirectedTo = '';
+			await routing.handleRegisterRoute({
+				loggedIn: false,
+				uid: 0,
+				query: {
+					next: nextTarget,
+				},
+				headers: {},
+			}, {
+				redirect(url) {
+					redirectedTo = url;
+				},
+			}, () => {});
+
+			const url = new URL(redirectedTo);
+			assert.equal(url.pathname, '/auth/authentik');
+			assert.equal(url.searchParams.has('next'), false);
+		}
+	} finally {
+		restore();
+	}
+});
+
 test('register route allows explicit local and invite-based registration flows', async () => {
 	const mocks = createMocks();
 	mocks.meta.config = {};
