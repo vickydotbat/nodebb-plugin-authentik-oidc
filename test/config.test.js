@@ -196,6 +196,22 @@ test('provider URLs reject private network targets by default', () => {
 			() => config.assertSafeUrl('https://192.168.1.20/application/o/nodebb/', 'issuer'),
 			/Must not target localhost or private network addresses/
 		);
+		assert.throws(
+			() => config.assertSafeUrl('https://[::1]/application/o/nodebb/', 'issuer'),
+			/Must not target localhost or private network addresses/
+		);
+		assert.throws(
+			() => config.assertSafeUrl('https://[fd00::1]/application/o/nodebb/', 'issuer'),
+			/Must not target localhost or private network addresses/
+		);
+		assert.throws(
+			() => config.assertSafeUrl('https://[feb0::1]/application/o/nodebb/', 'issuer'),
+			/Must not target localhost or private network addresses/
+		);
+		assert.throws(
+			() => config.assertSafeUrl('https://[::ffff:127.0.0.1]/application/o/nodebb/', 'issuer'),
+			/Must not target localhost or private network addresses/
+		);
 	} finally {
 		restore();
 	}

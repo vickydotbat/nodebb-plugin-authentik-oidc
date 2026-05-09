@@ -140,13 +140,5 @@ plugin.initAuth = async function (strategies) {
 };
 
 plugin.whitelistUserFields = async function (payload) {
-	payload.whitelist.push(
-		'authentikSub',
-		'authentikIssuer',
-		'authentikLinkedAt',
-		'authentikLastLoginAt',
-		'authentikLastEmail',
-		'authentikLastSyncedAt'
-	);
 	return payload;
 };

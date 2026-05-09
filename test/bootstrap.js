@@ -25,6 +25,15 @@ function installNodebbMocks(mocks) {
 		if (request === 'nconf') {
 			return mocks.nconf;
 		}
+		if (request === 'passport' && mocks.passport) {
+			return mocks.passport;
+		}
+		if (request === './src/routes/helpers' && mocks.routeHelpers) {
+			return mocks.routeHelpers;
+		}
+		if (request === './src/privileges' && mocks.privileges) {
+			return mocks.privileges;
+		}
 		if (request === './src/logger' || request === './src/winston') {
 			return mocks.logger;
 		}
@@ -57,6 +66,24 @@ function createMocks() {
 		info() {},
 		warn() {},
 		error() {},
+	};
+
+	const passport = {
+		use() {},
+	};
+
+	const routeHelpers = {
+		setupAdminPageRoute() {},
+		setupPageRoute() {},
+		setupApiRoute() {},
+	};
+
+	const privileges = {
+		admin: {
+			async can() {
+				return true;
+			},
+		},
 	};
 
 	const user = {
@@ -229,7 +256,7 @@ function createMocks() {
 		},
 	};
 
-	return { state, user, db, logger, meta, nconf };
+	return { state, user, db, logger, meta, nconf, passport, routeHelpers, privileges };
 }
 
 module.exports = {

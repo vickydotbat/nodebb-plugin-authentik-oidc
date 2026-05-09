@@ -83,6 +83,14 @@ function loadOidcForIdToken({ header, keys, claims }) {
 	};
 }
 
+function oidcHash(value, algorithm = 'RS256') {
+	const digestAlgorithm = algorithm.includes('384') ? 'sha384' :
+		algorithm.includes('512') ? 'sha512' :
+			'sha256';
+	const digest = crypto.createHash(digestAlgorithm).update(value).digest();
+	return digest.subarray(0, digest.length / 2).toString('base64url');
+}
+
 function loadOidcForLogoutToken({ header, keys, claims }) {
 	const originalLoad = Module._load;
 	Module._load = function (request, parent, isMain) {
@@ -433,6 +441,98 @@ test('ID token verification accepts multi-audience token with matching authorize
 			clientId: 'nodebb',
 			issuer: 'https://auth.example.com/application/o/nodebb/',
 		}, 'token', 'nonce-1');
+		assert.equal(claims.sub, 'sub-1');
+	} finally {
+		restore();
+	}
+});
+
+test('ID token verification rejects invalid access token hash when present', async () => {
+	const { publicKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
+	const signingJwk = publicKey.export({ format: 'jwk' });
+	signingJwk.kid = 'signing-key';
+	signingJwk.use = 'sig';
+	signingJwk.alg = 'RS256';
+
+	const { oidc, restore } = loadOidcForIdToken({
+		header: { alg: 'RS256', kid: 'signing-key' },
+		keys: [signingJwk],
+		claims: {
+			sub: 'sub-1',
+			nonce: 'nonce-1',
+			at_hash: oidcHash('different-access-token'),
+		},
+	});
+	try {
+		await assert.rejects(
+			oidc.verifyIdToken({
+				jwksUri: 'https://auth.example.com/jwks/',
+				clientId: 'nodebb',
+				issuer: 'https://auth.example.com/application/o/nodebb/',
+			}, 'token', 'nonce-1', { accessToken: 'access-token' }),
+			/access token hash/
+		);
+	} finally {
+		restore();
+	}
+});
+
+test('ID token verification rejects invalid authorization code hash when present', async () => {
+	const { publicKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
+	const signingJwk = publicKey.export({ format: 'jwk' });
+	signingJwk.kid = 'signing-key';
+	signingJwk.use = 'sig';
+	signingJwk.alg = 'RS256';
+
+	const { oidc, restore } = loadOidcForIdToken({
+		header: { alg: 'RS256', kid: 'signing-key' },
+		keys: [signingJwk],
+		claims: {
+			sub: 'sub-1',
+			nonce: 'nonce-1',
+			c_hash: oidcHash('different-code'),
+		},
+	});
+	try {
+		await assert.rejects(
+			oidc.verifyIdToken({
+				jwksUri: 'https://auth.example.com/jwks/',
+				clientId: 'nodebb',
+				issuer: 'https://auth.example.com/application/o/nodebb/',
+			}, 'token', 'nonce-1', { code: 'authorization-code' }),
+			/authorization code hash/
+		);
+	} finally {
+		restore();
+	}
+});
+
+test('ID token verification accepts matching access token and authorization code hashes', async () => {
+	const { publicKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
+	const signingJwk = publicKey.export({ format: 'jwk' });
+	signingJwk.kid = 'signing-key';
+	signingJwk.use = 'sig';
+	signingJwk.alg = 'RS256';
+
+	const { oidc, restore } = loadOidcForIdToken({
+		header: { alg: 'RS256', kid: 'signing-key' },
+		keys: [signingJwk],
+		claims: {
+			sub: 'sub-1',
+			nonce: 'nonce-1',
+			at_hash: oidcHash('access-token'),
+			c_hash: oidcHash('authorization-code'),
+		},
+	});
+	try {
+		const claims = await oidc.verifyIdToken({
+			jwksUri: 'https://auth.example.com/jwks/',
+			clientId: 'nodebb',
+			issuer: 'https://auth.example.com/application/o/nodebb/',
+		}, 'token', 'nonce-1', {
+			accessToken: 'access-token',
+			code: 'authorization-code',
+		});
 		assert.equal(claims.sub, 'sub-1');
 	} finally {
 		restore();
