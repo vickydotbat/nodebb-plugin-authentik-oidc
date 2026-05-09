@@ -124,6 +124,8 @@ plugin.addAdminNavigation = async function (header) {
 
 plugin.addProfileMenuItem = profile.addProfileMenuItem;
 
+plugin.filterAuthOptions = routing.filterAuthOptions;
+
 plugin.onUserLoggedIn = async function ({ uid, req }) {
 	await identity.updateSidSessionMapping(uid, req && req.sessionID);
 };

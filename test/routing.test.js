@@ -109,6 +109,57 @@ test('login route stays local by default', async () => {
 	}
 });
 
+test('direct OIDC launch clears stale return targets when no explicit next is supplied', () => {
+	const mocks = createMocks();
+	const { routing, restore } = loadRouting(mocks);
+	try {
+		const payload = {
+			req: {
+				path: '/auth/authentik',
+				query: {},
+				session: {
+					returnTo: '/admin/plugins/authentik-oidc',
+					next: '/admin/plugins/authentik-oidc',
+				},
+			},
+			opts: {},
+		};
+		const result = routing.filterAuthOptions(payload);
+
+		assert.equal(result, payload);
+		assert.equal(payload.req.session.returnTo, undefined);
+		assert.equal(payload.req.session.next, undefined);
+	} finally {
+		restore();
+	}
+});
+
+test('direct OIDC launch preserves explicit safe next target', () => {
+	const mocks = createMocks();
+	const { routing, restore } = loadRouting(mocks);
+	try {
+		const payload = {
+			req: {
+				path: '/auth/authentik',
+				query: {
+					next: '/category/2/announcements',
+				},
+				session: {
+					returnTo: '/admin/plugins/authentik-oidc',
+					next: '/admin/plugins/authentik-oidc',
+				},
+			},
+			opts: {},
+		};
+		routing.filterAuthOptions(payload);
+
+		assert.equal(payload.req.session.returnTo, '/category/2/announcements');
+		assert.equal(payload.req.session.next, '/category/2/announcements');
+	} finally {
+		restore();
+	}
+});
+
 test('anonymous register redirect preserves requested next target', async () => {
 	const mocks = createMocks();
 	mocks.meta.config = {};

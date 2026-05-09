@@ -34,6 +34,10 @@
       "method": "initAuth"
     },
     {
+      "hook": "filter:auth.options",
+      "method": "filterAuthOptions"
+    },
+    {
       "hook": "action:user.loggedIn",
       "method": "onUserLoggedIn"
     },
