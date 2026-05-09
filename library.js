@@ -6,6 +6,7 @@ const privileges = require.main.require('./src/privileges');
 
 const admin = require('./lib/admin');
 const config = require('./lib/config');
+const identity = require('./lib/identity');
 const logout = require('./lib/logout');
 const profile = require('./lib/profile');
 const routing = require('./lib/routing');
@@ -122,6 +123,10 @@ plugin.addAdminNavigation = async function (header) {
 };
 
 plugin.addProfileMenuItem = profile.addProfileMenuItem;
+
+plugin.onUserLoggedIn = async function ({ uid, req }) {
+	await identity.updateSidSessionMapping(uid, req && req.sessionID);
+};
 
 plugin.initAuth = async function (strategies) {
 	const settings = await config.getSettings();

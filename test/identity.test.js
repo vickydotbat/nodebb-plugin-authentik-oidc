@@ -235,6 +235,29 @@ test('login stores OIDC sid for back-channel logout mapping', async () => {
 	}
 });
 
+test('post-login sid mapping update stores the NodeBB session id', async () => {
+	const mocks = createMocks();
+	mocks.state.users.set(42, {
+		uid: 42,
+		username: 'linked',
+		authentikIssuer: 'https://id.example.com',
+		authentikSub: 'sub-1',
+		authentikLastSid: 'oidc-sid-1',
+	});
+	const { identity, restore } = loadIdentity(mocks);
+	try {
+		await identity.updateSidSessionMapping(42, 'nodebb-session-1');
+		assert.deepEqual(mocks.state.sidToUid.get('oidc-sid-1'), {
+			uid: 42,
+			issuer: 'https://id.example.com',
+			sub: 'sub-1',
+			sessionId: 'nodebb-session-1',
+		});
+	} finally {
+		restore();
+	}
+});
+
 test('same sub repeatedly resolves to same uid', async () => {
 	const mocks = createMocks();
 	const { identity, restore } = loadIdentity(mocks);

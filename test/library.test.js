@@ -30,6 +30,7 @@ function loadLibrary(mocks, helpers) {
 	};
 	[
 		'../lib/config',
+		'../lib/identity',
 		'../lib/strategy',
 		'../library',
 	].forEach((modulePath) => {
@@ -41,6 +42,7 @@ function loadLibrary(mocks, helpers) {
 		restore() {
 			[
 				'../lib/config',
+				'../lib/identity',
 				'../lib/strategy',
 				'../library',
 			].forEach((modulePath) => {
@@ -154,6 +156,34 @@ test('auth strategy disables NodeBB outer state check because plugin validates O
 		assert.equal(strategies.length, 1);
 		assert.equal(strategies[0].name, 'authentik');
 		assert.equal(strategies[0].checkState, false);
+	} finally {
+		restore();
+	}
+});
+
+test('successful NodeBB login hook updates OIDC sid session mapping', async () => {
+	const mocks = createMocks();
+	mocks.state.users.set(42, {
+		uid: 42,
+		username: 'linked',
+		authentikIssuer: 'https://id.example.com',
+		authentikSub: 'sub-1',
+		authentikLastSid: 'oidc-sid-1',
+	});
+	const { library, restore } = loadLibrary(mocks);
+	try {
+		await library.onUserLoggedIn({
+			uid: 42,
+			req: {
+				sessionID: 'nodebb-session-1',
+			},
+		});
+		assert.deepEqual(mocks.state.sidToUid.get('oidc-sid-1'), {
+			uid: 42,
+			issuer: 'https://id.example.com',
+			sub: 'sub-1',
+			sessionId: 'nodebb-session-1',
+		});
 	} finally {
 		restore();
 	}

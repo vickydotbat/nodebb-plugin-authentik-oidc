@@ -34,6 +34,10 @@
       "method": "initAuth"
     },
     {
+      "hook": "action:user.loggedIn",
+      "method": "onUserLoggedIn"
+    },
+    {
       "hook": "filter:user.whitelistFields",
       "method": "whitelistUserFields"
     }

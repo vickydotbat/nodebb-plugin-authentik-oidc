@@ -61,7 +61,11 @@ function response() {
 test('back-channel logout revokes NodeBB sessions when enabled and sub maps to uid', async () => {
 	const mocks = createMocks();
 	mocks.state.subToUid.set('sub-1', 42);
-	mocks.state.users.set(42, { uid: 42, username: 'linked' });
+	mocks.state.users.set(42, {
+		uid: 42,
+		username: 'linked',
+		authentikIssuer: 'https://auth.example.com/application/o/nodebb/',
+	});
 	mocks.state.settings.set('authentik-oidc', {
 		backchannelLogoutEnabled: true,
 		clientId: 'nodebb',
@@ -90,7 +94,11 @@ test('back-channel logout revokes NodeBB sessions when enabled and sub maps to u
 test('back-channel logout accepts form-encoded logout token bodies', async () => {
 	const mocks = createMocks();
 	mocks.state.subToUid.set('sub-1', 42);
-	mocks.state.users.set(42, { uid: 42, username: 'linked' });
+	mocks.state.users.set(42, {
+		uid: 42,
+		username: 'linked',
+		authentikIssuer: 'https://auth.example.com/application/o/nodebb/',
+	});
 	mocks.state.settings.set('authentik-oidc', {
 		backchannelLogoutEnabled: true,
 		clientId: 'nodebb',
@@ -167,6 +175,53 @@ test('back-channel logout with sid revokes only mapped NodeBB session when avail
 			query: {},
 		}, res);
 		assert.equal(res.statusCode, 204);
+		assert.deepEqual(revoked, [{ sessionId: 'nodebb-session-1', uid: 42 }]);
+		assert.deepEqual(mocks.state.revokedSessionsForUids, []);
+	} finally {
+		restore();
+	}
+});
+
+test('back-channel logout prefers sid mapping when token also includes sub', async () => {
+	const mocks = createMocks();
+	mocks.state.subToUid.set('sub-1', 42);
+	mocks.state.sidToUid.set('sid-1', {
+		uid: 42,
+		issuer: 'https://auth.example.com/application/o/nodebb/',
+		sub: 'sub-1',
+		sessionId: 'nodebb-session-1',
+	});
+	mocks.state.users.set(42, {
+		uid: 42,
+		username: 'linked',
+		authentikIssuer: 'https://auth.example.com/application/o/nodebb/',
+	});
+	mocks.state.settings.set('authentik-oidc', {
+		backchannelLogoutEnabled: true,
+		clientId: 'nodebb',
+		issuer: 'https://auth.example.com/application/o/nodebb/',
+		jwksUri: 'https://auth.example.com/jwks/',
+	});
+	const revoked = [];
+	mocks.user.auth.revokeSession = async (sessionId, uid) => {
+		revoked.push({ sessionId, uid });
+	};
+	const { logout, restore } = loadLogout(mocks, {
+		issuer: 'https://auth.example.com/application/o/nodebb/',
+		sub: 'sub-1',
+		sid: 'sid-1',
+	});
+	try {
+		const res = response();
+		await logout.handleBackchannelLogout({
+			body: { logout_token: 'signed-token' },
+			query: {},
+		}, res);
+		const diagnostics = require('../lib/diagnostics');
+		const event = await diagnostics.getLastLogoutEvent();
+
+		assert.equal(res.statusCode, 204);
+		assert.equal(event.source, 'sid');
 		assert.deepEqual(revoked, [{ sessionId: 'nodebb-session-1', uid: 42 }]);
 		assert.deepEqual(mocks.state.revokedSessionsForUids, []);
 	} finally {
